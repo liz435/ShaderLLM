@@ -29,7 +29,6 @@ void main() {
 function parseShaderLog(log: string, stage: 'vertex' | 'fragment' | 'link'): ShaderError[] {
   if (!log) return [];
   const errors: ShaderError[] = [];
-  // Common WebGL error format: ERROR: 0:LINE: 'message'
   const lineRegex = /(?:ERROR|WARNING):\s*\d+:(\d+):\s*(.+)/g;
   let match;
   while ((match = lineRegex.exec(log)) !== null) {
@@ -40,7 +39,6 @@ function parseShaderLog(log: string, stage: 'vertex' | 'fragment' | 'link'): Sha
       stage,
     });
   }
-  // If no structured errors were parsed, return the whole log as one error
   if (errors.length === 0 && log.trim()) {
     errors.push({ line: 0, message: log.trim(), severity: 'error', stage });
   }
@@ -56,19 +54,28 @@ export class ShaderRenderer {
   private animFrameId = 0;
   private mouse: [number, number, number, number] = [0, 0, 0, 0];
   private running = false;
+  private paused = false;
+  private pausedTime = 0;
+  private pauseOffset = 0;
+  private resolutionScale = 1;
+
+  // FPS tracking
+  private lastFrameTime = 0;
+  private fpsAccumulator = 0;
+  private fpsFrameCount = 0;
+  private currentFps = 0;
 
   constructor(canvas: HTMLCanvasElement) {
-    const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: false });
+    const gl = canvas.getContext('webgl2', { antialias: false, preserveDrawingBuffer: true });
     if (!gl) throw new Error('WebGL2 is not supported');
     this.gl = gl;
     this.startTime = performance.now() / 1000;
     this.quadBuffer = createFullscreenQuadBuffer(gl);
 
-    // Track mouse
     canvas.addEventListener('mousemove', (e) => {
       const rect = canvas.getBoundingClientRect();
       this.mouse[0] = e.clientX - rect.left;
-      this.mouse[1] = rect.height - (e.clientY - rect.top); // flip Y
+      this.mouse[1] = rect.height - (e.clientY - rect.top);
     });
     canvas.addEventListener('mousedown', () => { this.mouse[2] = 1; });
     canvas.addEventListener('mouseup', () => { this.mouse[2] = 0; });
@@ -78,7 +85,6 @@ export class ShaderRenderer {
     const gl = this.gl;
     const allErrors: ShaderError[] = [];
 
-    // Compile vertex shader
     const vs = gl.createShader(gl.VERTEX_SHADER)!;
     gl.shaderSource(vs, vertexSrc || DEFAULT_VERTEX_SHADER);
     gl.compileShader(vs);
@@ -89,7 +95,6 @@ export class ShaderRenderer {
       return { success: false, errors: allErrors };
     }
 
-    // Compile fragment shader
     const fs = gl.createShader(gl.FRAGMENT_SHADER)!;
     gl.shaderSource(fs, fragmentSrc);
     gl.compileShader(fs);
@@ -101,13 +106,11 @@ export class ShaderRenderer {
       return { success: false, errors: allErrors };
     }
 
-    // Link program
     const program = gl.createProgram()!;
     gl.attachShader(program, vs);
     gl.attachShader(program, fs);
     gl.linkProgram(program);
 
-    // Shaders can be deleted after linking
     gl.deleteShader(vs);
     gl.deleteShader(fs);
 
@@ -118,11 +121,9 @@ export class ShaderRenderer {
       return { success: false, errors: allErrors };
     }
 
-    // Success — swap old program
     if (this.program) gl.deleteProgram(this.program);
     this.program = program;
 
-    // Set up vertex attribute for the quad
     const posLoc = gl.getAttribLocation(program, 'aPosition');
     gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
     gl.enableVertexAttribArray(posLoc);
@@ -135,17 +136,32 @@ export class ShaderRenderer {
     if (this.running) return;
     this.running = true;
     this.startTime = performance.now() / 1000;
+    this.pauseOffset = 0;
     this.frameCount = 0;
+    this.lastFrameTime = performance.now();
 
     const render = () => {
       if (!this.running) return;
       this.animFrameId = requestAnimationFrame(render);
 
+      // FPS calculation
+      const now = performance.now();
+      const delta = now - this.lastFrameTime;
+      this.lastFrameTime = now;
+      this.fpsAccumulator += delta;
+      this.fpsFrameCount++;
+      if (this.fpsAccumulator >= 500) {
+        this.currentFps = Math.round((this.fpsFrameCount / this.fpsAccumulator) * 1000);
+        this.fpsAccumulator = 0;
+        this.fpsFrameCount = 0;
+      }
+
+      if (this.paused) return;
+
       const gl = this.gl;
       const canvas = gl.canvas as HTMLCanvasElement;
 
-      // Resize to match display size
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = (window.devicePixelRatio || 1) * this.resolutionScale;
       const displayW = Math.floor(canvas.clientWidth * dpr);
       const displayH = Math.floor(canvas.clientHeight * dpr);
       if (canvas.width !== displayW || canvas.height !== displayH) {
@@ -159,7 +175,7 @@ export class ShaderRenderer {
       gl.useProgram(this.program);
 
       setStandardUniforms(gl, this.program, {
-        iTime: performance.now() / 1000 - this.startTime,
+        iTime: performance.now() / 1000 - this.startTime - this.pauseOffset,
         iResolution: [canvas.width, canvas.height],
         iMouse: this.mouse,
         iFrame: this.frameCount,
@@ -171,6 +187,82 @@ export class ShaderRenderer {
 
     render();
   }
+
+  // --- Playback controls ---
+
+  togglePause(): boolean {
+    if (this.paused) {
+      this.pauseOffset += performance.now() / 1000 - this.pausedTime;
+      this.paused = false;
+    } else {
+      this.pausedTime = performance.now() / 1000;
+      this.paused = true;
+    }
+    return this.paused;
+  }
+
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  resetTime(): void {
+    this.startTime = performance.now() / 1000;
+    this.pauseOffset = 0;
+    this.frameCount = 0;
+    if (this.paused) {
+      this.pausedTime = performance.now() / 1000;
+    }
+  }
+
+  getElapsedTime(): number {
+    if (this.paused) {
+      return this.pausedTime - this.startTime - this.pauseOffset;
+    }
+    return performance.now() / 1000 - this.startTime - this.pauseOffset;
+  }
+
+  getFps(): number {
+    return this.currentFps;
+  }
+
+  // --- Resolution ---
+
+  setResolutionScale(scale: number): void {
+    this.resolutionScale = scale;
+  }
+
+  getResolutionScale(): number {
+    return this.resolutionScale;
+  }
+
+  // --- Screenshot ---
+
+  screenshot(): void {
+    const canvas = this.gl.canvas as HTMLCanvasElement;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      a.href = url;
+      a.download = `shader-${date}.png`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  }
+
+  // --- Fullscreen ---
+
+  toggleFullscreen(): void {
+    const canvas = this.gl.canvas as HTMLCanvasElement;
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      canvas.requestFullscreen();
+    }
+  }
+
+  // --- Lifecycle ---
 
   stop(): void {
     this.running = false;
