@@ -5,7 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.examples import get_available_tags, search_by_keywords
-from backend.app.agent.prompts.v0.prompts import CLARIFY_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT
+from app.agent.prompts import CLARIFY_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT
 from app.agent.state import AgentState
 from app.agent.utils import build_draft_prompt, extract_glsl, extract_reasoning
 from app.config import settings
