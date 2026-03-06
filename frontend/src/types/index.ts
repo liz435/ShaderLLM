@@ -14,6 +14,7 @@ export interface CompileResult {
 
 export type SSEEventType =
   | 'thinking'
+  | 'text_delta'
   | 'shader_code'
   | 'validation'
   | 'repair_start'

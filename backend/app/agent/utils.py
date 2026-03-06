@@ -1,6 +1,30 @@
 import json
 import re
 
+from app.agent.examples import select_examples
+
+
+def build_draft_prompt(base_prompt: str, user_prompt: str) -> str:
+    """Build the full draft system prompt with dynamically selected examples."""
+    examples = select_examples(user_prompt, max_examples=2)
+
+    example_sections = []
+    for ex in examples:
+        example_sections.append(
+            f'Prompt: "{ex["prompt"]}"\n\n```glsl\n{ex["code"]}\n```'
+        )
+
+    examples_text = "\n\n---\n\n".join(example_sections)
+
+    return (
+        base_prompt
+        + "\n\n────────────────────────────────────────────────────\n"
+        "REFERENCE EXAMPLES (match or exceed this quality level)\n"
+        "────────────────────────────────────────────────────\n"
+        + examples_text
+        + "\n\nYour shader must be at least as complex and visually rich as these examples."
+    )
+
 
 def extract_glsl(text: str) -> str | None:
     """Extract GLSL code from markdown fences in LLM response.

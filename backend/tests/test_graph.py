@@ -30,15 +30,15 @@ void main() {
 
 def _make_initial_state(prompt: str = "a colorful plasma"):
     return {
-        "messages": [],
         "user_prompt": prompt,
         "fragment_shader": None,
-        "vertex_shader": None,
         "validation_result": None,
         "retry_count": 0,
         "max_retries": 3,
         "pending_events": [],
         "mode": "generate",
+        "conversation_history": [],
+        "repair_history": [],
         "error": None,
     }
 

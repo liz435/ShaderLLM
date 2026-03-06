@@ -1,7 +1,5 @@
 from typing import Annotated, Literal
 
-from langchain_core.messages import BaseMessage
-from langgraph.graph import add_messages
 from typing_extensions import TypedDict
 
 from app.models.events import SSEEvent
@@ -13,16 +11,27 @@ def _concat_events(existing: list[SSEEvent], new: list[SSEEvent]) -> list[SSEEve
     return existing + new
 
 
-class AgentState(TypedDict):
-    # Conversation messages (LangGraph reducer appends)
-    messages: Annotated[list[BaseMessage], add_messages]
+class ConversationTurn(TypedDict):
+    role: str
+    content: str
 
+
+class RepairAttempt(TypedDict):
+    errors: str
+    shader_snippet: str
+
+
+def _concat_repairs(existing: list[RepairAttempt], new: list[RepairAttempt]) -> list[RepairAttempt]:
+    """Reducer that accumulates repair history across nodes."""
+    return existing + new
+
+
+class AgentState(TypedDict):
     # User's original prompt
     user_prompt: str
 
     # Generated GLSL code
     fragment_shader: str | None
-    vertex_shader: str | None
 
     # Validation
     validation_result: ValidationResult | None
@@ -38,7 +47,13 @@ class AgentState(TypedDict):
     mode: Literal["generate", "refine"]
 
     # Prior conversation turns for multi-turn context
-    conversation_history: list[dict]
+    conversation_history: list[ConversationTurn]
+
+    # History of failed repair attempts (structured error recovery)
+    repair_history: Annotated[list[RepairAttempt], _concat_repairs]
+
+    # Clarification question (if prompt was too vague)
+    clarification: str | None
 
     # DSL support
     use_dsl: bool

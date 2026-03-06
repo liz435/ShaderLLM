@@ -30,6 +30,13 @@ def route_after_dsl_draft(state: AgentState) -> str:
     return "draft"
 
 
+def route_after_draft(state: AgentState) -> str:
+    """Route after draft: clarification skips validation, otherwise validate."""
+    if state.get("clarification"):
+        return "finalize"
+    return "validate"
+
+
 def route_after_validate(state: AgentState) -> str:
     """Decide whether to finalize, repair, or give up."""
     vr = state.get("validation_result")
@@ -82,8 +89,14 @@ def build_graph():
         {"validate": "validate", "draft": "draft"},
     )
 
-    # Both draft and refine flow into validate
-    graph.add_edge("draft", "validate")
+    # Draft -> conditional: clarification goes to finalize, else validate
+    graph.add_conditional_edges(
+        "draft",
+        route_after_draft,
+        {"finalize": "finalize", "validate": "validate"},
+    )
+
+    # Refine always goes to validate
     graph.add_edge("refine", "validate")
 
     # validate -> conditional routing
@@ -100,3 +113,7 @@ def build_graph():
     graph.add_edge("finalize", END)
 
     return graph.compile()
+
+
+# Pre-compiled graph singleton — avoids recompilation on every request
+compiled_graph = build_graph()
