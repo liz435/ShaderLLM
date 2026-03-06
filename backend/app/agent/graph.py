@@ -1,16 +1,32 @@
 from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes.draft import draft_shader, refine_shader
+from app.agent.nodes.draft_dsl import draft_shader_dsl
 from app.agent.nodes.finalize import finalize
 from app.agent.nodes.repair import repair_shader
 from app.agent.nodes.validate import validate_shader
 from app.agent.state import AgentState
+from app.agent.utils import classify_prompt_complexity
 
 
 def route_after_start(state: AgentState) -> str:
-    """Route to draft or refine based on mode."""
+    """Route to draft_dsl, draft, or refine based on mode and prompt complexity."""
     if state.get("mode") == "refine" and state.get("fragment_shader"):
         return "refine"
+
+    # Use DSL path for standard prompts, direct GLSL for complex ones
+    complexity = classify_prompt_complexity(state.get("user_prompt", ""))
+    if complexity == "dsl":
+        return "draft_dsl"
+    return "draft"
+
+
+def route_after_dsl_draft(state: AgentState) -> str:
+    """After DSL draft: validate if we got GLSL, fallback to direct draft otherwise."""
+    if state.get("error") == "dsl_fallback":
+        return "draft"
+    if state.get("fragment_shader"):
+        return "validate"
     return "draft"
 
 
@@ -38,21 +54,32 @@ def build_graph():
     """Build and compile the shader generation graph.
 
     Graph topology:
-        START → [draft | refine] → validate → [finalize | repair → validate → ...]
+        START → [draft_dsl | draft | refine] → validate → [finalize | repair → validate → ...]
+
+    The DSL path (draft_dsl) generates a compact JSON spec compiled to GLSL.
+    If DSL fails, it falls back to the direct draft node.
     """
     graph = StateGraph(AgentState)
 
+    graph.add_node("draft_dsl", draft_shader_dsl)
     graph.add_node("draft", draft_shader)
     graph.add_node("refine", refine_shader)
     graph.add_node("validate", validate_shader)
     graph.add_node("repair", repair_shader)
     graph.add_node("finalize", finalize)
 
-    # START -> route to draft or refine
+    # START -> route to draft_dsl, draft, or refine
     graph.add_conditional_edges(
         START,
         route_after_start,
-        {"draft": "draft", "refine": "refine"},
+        {"draft_dsl": "draft_dsl", "draft": "draft", "refine": "refine"},
+    )
+
+    # DSL draft -> conditional: validate (success) or draft (fallback)
+    graph.add_conditional_edges(
+        "draft_dsl",
+        route_after_dsl_draft,
+        {"validate": "validate", "draft": "draft"},
     )
 
     # Both draft and refine flow into validate

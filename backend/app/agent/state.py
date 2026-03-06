@@ -40,5 +40,9 @@ class AgentState(TypedDict):
     # Prior conversation turns for multi-turn context
     conversation_history: list[dict]
 
+    # DSL support
+    use_dsl: bool
+    dsl_spec: dict | None
+
     # Error message if unrecoverable
     error: str | None
