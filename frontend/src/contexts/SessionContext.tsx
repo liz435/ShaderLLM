@@ -34,6 +34,10 @@ interface SessionContextValue {
   retryCount: number;
   error: string | null;
   abort: () => void;
+
+  // Prompt version
+  promptVersion: number | null;
+  setPromptVersion: (v: number | null) => void;
 }
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -151,6 +155,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         retryCount: gen.retryCount,
         error: gen.error,
         abort: gen.abort,
+        promptVersion: gen.promptVersion,
+        setPromptVersion: gen.setPromptVersion,
       }}
     >
       {children}

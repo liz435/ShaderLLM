@@ -5,7 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.examples import get_available_tags, search_by_keywords
-from app.agent.prompts import CLARIFY_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT
+from app.agent.prompts import get_prompts
 from app.agent.state import AgentState
 from app.agent.utils import build_draft_prompt, extract_glsl, extract_reasoning
 from app.config import settings
@@ -64,13 +64,13 @@ async def _invoke_with_timeout(llm, messages: list, timeout: float | None = None
     )
 
 
-async def _check_clarity(llm, user_prompt: str) -> str | None:
+async def _check_clarity(llm, user_prompt: str, clarify_prompt: str) -> str | None:
     """Check if the prompt is clear enough to generate a shader.
 
     Returns None if clear, or a clarification question string if unclear.
     """
     messages = [
-        SystemMessage(content=CLARIFY_SYSTEM_PROMPT),
+        SystemMessage(content=clarify_prompt),
         HumanMessage(content=user_prompt),
     ]
     try:
@@ -102,6 +102,7 @@ async def draft_shader(state: AgentState) -> dict:
     """
     llm = get_llm()
     t0 = time.time()
+    prompts = get_prompts(state.get("prompt_version"))
 
     events: list[SSEEvent] = []
     user_prompt = state["user_prompt"]
@@ -112,7 +113,7 @@ async def draft_shader(state: AgentState) -> dict:
 
     llm_with_tools = llm.bind_tools(_TOOLS)
     tool_messages = [
-        SystemMessage(content=DRAFT_SYSTEM_PROMPT),
+        SystemMessage(content=prompts["DRAFT_SYSTEM_PROMPT"]),
         HumanMessage(
             content=(
                 f"{user_prompt}\n\n"
@@ -123,7 +124,7 @@ async def draft_shader(state: AgentState) -> dict:
         ),
     ]
 
-    clarity_task = asyncio.create_task(_check_clarity(llm, user_prompt))
+    clarity_task = asyncio.create_task(_check_clarity(llm, user_prompt, prompts["CLARIFY_SYSTEM_PROMPT"]))
     tool_task = asyncio.create_task(
         asyncio.wait_for(llm_with_tools.ainvoke(tool_messages), timeout=settings.request_timeout)
     )
@@ -210,7 +211,7 @@ async def draft_shader(state: AgentState) -> dict:
         events.append(SSEEvent(type="thinking", data={
             "text": "Falling back to static example selection...",
         }))
-        system_prompt = build_draft_prompt(DRAFT_SYSTEM_PROMPT, user_prompt)
+        system_prompt = build_draft_prompt(prompts["DRAFT_SYSTEM_PROMPT"], user_prompt)
         messages = [
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt),
@@ -267,15 +268,16 @@ async def draft_shader(state: AgentState) -> dict:
 
 async def refine_shader(state: AgentState) -> dict:
     """Modify an existing shader based on user feedback."""
-    llm = get_llm()
+    llm = get_llm(temperature=settings.temperature_refine)
     t0 = time.time()
+    prompts = get_prompts(state.get("prompt_version"))
 
     events: list[SSEEvent] = []
     events.append(SSEEvent(type="thinking", data={"text": "Refining shader..."}))
 
     current_shader = state.get("fragment_shader") or ""
 
-    prompt = REFINE_SYSTEM_PROMPT.replace("{current_shader}", current_shader)
+    prompt = prompts["REFINE_SYSTEM_PROMPT"].replace("{current_shader}", current_shader)
 
     messages = [
         SystemMessage(content=prompt),

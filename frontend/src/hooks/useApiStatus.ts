@@ -4,6 +4,8 @@ interface ApiStatus {
   online: boolean;
   provider: string | null;
   model: string | null;
+  promptVersion: number | null;
+  promptVersions: number[];
   checking: boolean;
 }
 
@@ -12,6 +14,8 @@ export function useApiStatus(pollInterval = 30_000): ApiStatus {
     online: false,
     provider: null,
     model: null,
+    promptVersion: null,
+    promptVersions: [],
     checking: true,
   });
 
@@ -24,6 +28,8 @@ export function useApiStatus(pollInterval = 30_000): ApiStatus {
         online: true,
         provider: data.provider ?? null,
         model: data.model ?? null,
+        promptVersion: data.prompt_version ?? null,
+        promptVersions: data.prompt_versions ?? [],
         checking: false,
       });
     } catch {

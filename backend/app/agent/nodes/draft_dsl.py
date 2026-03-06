@@ -5,9 +5,9 @@ import time
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.error_handling import safe_node
-from backend.app.agent.prompts.v0.prompts import DSL_DRAFT_SYSTEM_PROMPT
+from app.agent.prompts import get_prompts
 from app.agent.state import AgentState
-from app.agent.utils import extract_dsl_json, extract_reasoning
+from app.agent.utils import extract_dsl_json, extract_reasoning, detect_dsl_unsupported
 from app.dsl.cache import get_cache
 from app.dsl.schema import ShaderDSL
 from app.llm.provider import get_llm
@@ -19,12 +19,13 @@ async def draft_shader_dsl(state: AgentState) -> dict:
     """Generate a shader by having the LLM produce a DSL spec, then compile to GLSL."""
     llm = get_llm()
     t0 = time.time()
+    prompts = get_prompts(state.get("prompt_version"))
 
     events: list[SSEEvent] = []
     events.append(SSEEvent(type="thinking", data={"text": "Generating shader via DSL..."}))
 
     messages = [
-        SystemMessage(content=DSL_DRAFT_SYSTEM_PROMPT),
+        SystemMessage(content=prompts["DSL_DRAFT_SYSTEM_PROMPT"]),
         HumanMessage(content=state["user_prompt"]),
     ]
 
@@ -35,6 +36,20 @@ async def draft_shader_dsl(state: AgentState) -> dict:
     reasoning = extract_reasoning(response.content)
     if reasoning:
         events.append(SSEEvent(type="thinking", data={"text": reasoning}))
+
+    # Check if LLM intentionally declined DSL (v2+ prompts instruct this for complex effects)
+    if detect_dsl_unsupported(response.content):
+        events.append(SSEEvent(type="thinking", data={
+            "text": "Effect requires direct GLSL — switching from DSL to full generation",
+        }))
+        return {
+            "messages": [response],
+            "fragment_shader": None,
+            "dsl_spec": None,
+            "use_dsl": False,
+            "pending_events": events,
+            "error": "dsl_fallback",
+        }
 
     # Extract DSL JSON
     dsl_json = extract_dsl_json(response.content)

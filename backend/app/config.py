@@ -12,7 +12,9 @@ class Settings(BaseSettings):
     glslang_path: str = "glslangValidator"
     max_retries: int = 3
     max_tokens: int = 4096
-    temperature: float = 0.7
+    temperature: float = 0.4
+    temperature_repair: float = 0.15
+    temperature_refine: float = 0.3
     request_timeout: int = 60
     llm_max_retries: int = 2
 

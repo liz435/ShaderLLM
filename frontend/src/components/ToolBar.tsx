@@ -1,4 +1,5 @@
 import { useApiStatus } from '../hooks/useApiStatus';
+import { useSession } from '../contexts/SessionContext';
 
 interface ToolBarProps {
   onReset: () => void;
@@ -9,6 +10,11 @@ interface ToolBarProps {
 
 export default function ToolBar({ onReset, onExport, hasShader, onToggleSidebar }: ToolBarProps) {
   const api = useApiStatus();
+  const { promptVersion, setPromptVersion } = useSession();
+
+  // Effective version: user selection or latest from backend
+  const effectiveVersion = promptVersion ?? api.promptVersion;
+  const versions = api.promptVersions;
 
   return (
     <header
@@ -54,6 +60,33 @@ export default function ToolBar({ onReset, onExport, hasShader, onToggleSidebar 
               {api.model}
             </span>
           )}
+          {versions.length > 1 ? (
+            <select
+              value={effectiveVersion ?? ''}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setPromptVersion(isNaN(v) ? null : v);
+              }}
+              aria-label="Select prompt version"
+              className="text-[10px] font-mono text-zinc-500 bg-transparent
+                         border border-white/[0.06] rounded px-1 py-0.5
+                         hover:border-white/[0.12] hover:text-zinc-300
+                         focus:outline-none focus:border-white/[0.15]
+                         cursor-pointer transition-colors duration-150
+                         appearance-none"
+              style={{ paddingRight: '14px', backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'8\' viewBox=\'0 0 8 8\'%3E%3Cpath d=\'M1.5 2.5L4 5l2.5-2.5\' fill=\'none\' stroke=\'%2371717a\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 3px center' }}
+            >
+              {versions.map((v) => (
+                <option key={v} value={v}>
+                  p{v}{v === api.promptVersion ? ' (latest)' : ''}
+                </option>
+              ))}
+            </select>
+          ) : effectiveVersion != null ? (
+            <span className="text-[10px] text-zinc-700 font-mono select-none">
+              p{effectiveVersion}
+            </span>
+          ) : null}
           {!api.online && !api.checking && (
             <span className="text-[10px] text-red-400/70 font-medium select-none">
               offline

@@ -59,5 +59,8 @@ class AgentState(TypedDict):
     use_dsl: bool
     dsl_spec: dict | None
 
+    # Prompt version override (None = latest)
+    prompt_version: int | None
+
     # Error message if unrecoverable
     error: str | None

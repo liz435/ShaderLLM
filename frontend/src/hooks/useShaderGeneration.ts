@@ -16,6 +16,8 @@ export interface ShaderGenerationState {
   error: string | null;
   conversationId: string | null;
   setConversationId: (id: string | null) => void;
+  promptVersion: number | null;
+  setPromptVersion: (v: number | null) => void;
 }
 
 export function useShaderGeneration(): ShaderGenerationState {
@@ -27,6 +29,7 @@ export function useShaderGeneration(): ShaderGenerationState {
   const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [promptVersion, setPromptVersion] = useState<number | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
 
   const handleEvent = useCallback((type: SSEEventType, data: Record<string, unknown>) => {
@@ -95,9 +98,10 @@ export function useShaderGeneration(): ShaderGenerationState {
       startStream('/api/generate', {
         prompt,
         conversation_id: convId || undefined,
+        prompt_version: promptVersion ?? undefined,
       });
     },
-    [startStream]
+    [startStream, promptVersion]
   );
 
   const refine = useCallback(
@@ -112,9 +116,10 @@ export function useShaderGeneration(): ShaderGenerationState {
         current_fragment_shader: currentShader,
         history: trimmedHistory,
         conversation_id: convId || undefined,
+        prompt_version: promptVersion ?? undefined,
       });
     },
-    [startStream]
+    [startStream, promptVersion]
   );
 
   const abort = useCallback(() => {
@@ -136,5 +141,7 @@ export function useShaderGeneration(): ShaderGenerationState {
     error,
     conversationId,
     setConversationId,
+    promptVersion,
+    setPromptVersion,
   };
 }

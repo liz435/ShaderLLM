@@ -3,7 +3,7 @@ import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from backend.app.agent.prompts.v0.prompts import REPAIR_SYSTEM_PROMPT
+from app.agent.prompts import get_prompts
 from app.agent.state import AgentState, RepairAttempt
 from app.agent.utils import extract_glsl, get_shader_line_context
 from app.config import settings
@@ -13,8 +13,9 @@ from app.models.events import SSEEvent
 
 async def repair_shader(state: AgentState) -> dict:
     """Repair a shader based on compilation errors."""
-    llm = get_llm()
+    llm = get_llm(temperature=settings.temperature_repair)
     t0 = time.time()
+    prompts = get_prompts(state.get("prompt_version"))
 
     retry = state["retry_count"] + 1
     max_r = state["max_retries"]
@@ -80,7 +81,7 @@ Return the fixed shader in a single ```glsl code block."""
     try:
         response = await asyncio.wait_for(
             llm.ainvoke([
-                SystemMessage(content=REPAIR_SYSTEM_PROMPT),
+                SystemMessage(content=prompts["REPAIR_SYSTEM_PROMPT"]),
                 HumanMessage(content=user_msg),
             ]),
             timeout=settings.request_timeout,

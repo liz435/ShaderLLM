@@ -73,6 +73,12 @@ def get_shader_line_context(shader: str, line_num: int, context: int = 2) -> str
     return "\n".join(result)
 
 
+def detect_dsl_unsupported(text: str) -> bool:
+    """Check if LLM intentionally declined DSL and requested raw GLSL fallback."""
+    lower = text.lower()
+    return "needs raw glsl" in lower or "switching to full shader generation" in lower
+
+
 def extract_dsl_json(text: str) -> dict | None:
     """Extract a JSON object from ```json fences or raw JSON in LLM response."""
     # Try fenced JSON blocks first

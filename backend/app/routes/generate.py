@@ -78,6 +78,7 @@ def _make_initial_state(
     mode: str = "generate",
     existing_shader: str | None = None,
     conversation_history: list[dict] | None = None,
+    prompt_version: int | None = None,
 ):
     return {
         "user_prompt": prompt,
@@ -88,6 +89,7 @@ def _make_initial_state(
         "mode": mode,
         "conversation_history": conversation_history or [],
         "repair_history": [],
+        "prompt_version": prompt_version,
     }
 
 
@@ -243,7 +245,7 @@ async def generate_shader(request: Request, body: GenerateRequest):
     session.add_message("human", body.prompt)
     conversation.link_run(session.session_id)
 
-    state = _make_initial_state(body.prompt)
+    state = _make_initial_state(body.prompt, prompt_version=body.prompt_version)
     return EventSourceResponse(_run_graph_stream(request, session, conversation, state, "generate"))
 
 
@@ -265,6 +267,7 @@ async def refine_shader(request: Request, body: RefineRequest):
         mode="refine",
         existing_shader=body.current_fragment_shader,
         conversation_history=body.history,
+        prompt_version=body.prompt_version,
     )
     return EventSourceResponse(_run_graph_stream(request, session, conversation, state, "refine"))
 
