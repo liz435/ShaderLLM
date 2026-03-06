@@ -12,6 +12,22 @@ async def finalize(state: AgentState) -> dict:
     shader = state.get("fragment_shader")
     retries = state.get("retry_count", 0)
     error = state.get("error")
+    clarification = state.get("clarification")
+
+    # If this was a clarification, just emit done without shader status
+    if clarification:
+        events.append(SSEEvent(
+            type="done",
+            data={
+                "shader": "",
+                "valid": False,
+                "retries": 0,
+                "error": None,
+                "clarification": clarification,
+                "timestamp": time.time(),
+            },
+        ))
+        return {"pending_events": events}
 
     # Summary thinking event
     if valid and shader:

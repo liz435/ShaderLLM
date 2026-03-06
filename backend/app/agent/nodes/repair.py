@@ -1,10 +1,12 @@
+import asyncio
 import time
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agent.prompts import REPAIR_SYSTEM_PROMPT
-from app.agent.state import AgentState
+from app.agent.state import AgentState, RepairAttempt
 from app.agent.utils import extract_glsl, get_shader_line_context
+from app.config import settings
 from app.llm.provider import get_llm
 from app.models.events import SSEEvent
 
@@ -39,10 +41,27 @@ async def repair_shader(state: AgentState) -> dict:
 
     error_text = "\n\n".join(error_sections) if error_sections else "Unknown compilation error"
 
-    # Build the user message with shader and errors
+    # Structured repair history — show the LLM what was already tried
+    history_section = ""
+    prior_attempts = state.get("repair_history", [])
+    if prior_attempts:
+        parts = []
+        for i, attempt in enumerate(prior_attempts, 1):
+            parts.append(
+                f"### Attempt {i}\n"
+                f"Errors seen: {attempt['errors']}\n"
+                f"Shader had: {attempt['shader_snippet']}"
+            )
+        history_section = (
+            f"\n\n## Previous failed repairs\n"
+            f"The following approaches were already tried and DID NOT work. "
+            f"Do NOT repeat the same fix — try a fundamentally different approach.\n\n"
+            + "\n\n".join(parts)
+        )
+
     user_msg = f"""## Errors to fix
 
-{error_text}
+{error_text}{history_section}
 
 ## Current shader
 
@@ -52,10 +71,31 @@ async def repair_shader(state: AgentState) -> dict:
 
 Return the fixed shader in a single ```glsl code block."""
 
-    response = await llm.ainvoke([
-        SystemMessage(content=REPAIR_SYSTEM_PROMPT),
-        HumanMessage(content=user_msg),
-    ])
+    # Record this attempt for future retries
+    new_attempt = RepairAttempt(
+        errors=error_text[:500],
+        shader_snippet=shader_code[:200] + ("..." if len(shader_code) > 200 else ""),
+    )
+
+    try:
+        response = await asyncio.wait_for(
+            llm.ainvoke([
+                SystemMessage(content=REPAIR_SYSTEM_PROMPT),
+                HumanMessage(content=user_msg),
+            ]),
+            timeout=settings.request_timeout,
+        )
+    except asyncio.TimeoutError:
+        elapsed = round(time.time() - t0, 2)
+        events.append(SSEEvent(type="thinking", data={
+            "text": f"Repair attempt {retry} timed out after {settings.request_timeout}s",
+        }))
+        return {
+            "fragment_shader": state["fragment_shader"],
+            "retry_count": retry,
+            "repair_history": [new_attempt],
+            "pending_events": events,
+        }
 
     elapsed = round(time.time() - t0, 2)
     code = extract_glsl(response.content)
@@ -72,8 +112,8 @@ Return the fixed shader in a single ```glsl code block."""
         }))
 
     return {
-        "messages": [response],
         "fragment_shader": code or state["fragment_shader"],
         "retry_count": retry,
+        "repair_history": [new_attempt],
         "pending_events": events,
     }

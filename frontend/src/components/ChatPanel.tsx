@@ -11,19 +11,19 @@ interface ChatPanelProps {
 
 const EXAMPLE_PROMPTS = [
   'A pulsing neon circle on a dark background',
-  'Ocean waves with foam and sunlight reflections',
-  'Hypnotic spiral tunnel with RGB color shift',
-  'Perlin noise terrain with altitude-based coloring',
+  'Ocean waves with foam and sunlight',
+  'Hypnotic spiral tunnel with RGB shift',
+  'Perlin noise terrain with coloring',
 ];
 
 export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanelProps) {
-  const { messages, events } = useSession();
+  const { messages, events, streamingText } = useSession();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const wasGenerating = useRef(false);
 
-  const thinkingText = events.findLast((e) => e.type === 'thinking')?.data?.text as string || 'Generating...';
+  const thinkingText = events.findLast((e) => e.type === 'thinking')?.data?.text as string || 'Thinking...';
   const retryCount = events.findLast((e) => e.type === 'repair_attempt')?.data?.attempt as number || 0;
 
   const adjustHeight = useCallback(() => {
@@ -33,12 +33,10 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
     el.style.height = Math.min(el.scrollHeight, 160) + 'px';
   }, []);
 
-  // Auto-scroll on new messages/events
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages, events]);
+  }, [messages, events, streamingText]);
 
-  // Auto-focus textarea when generation completes
   useEffect(() => {
     if (wasGenerating.current && !isGenerating) {
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -50,74 +48,52 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
     e.preventDefault();
     const prompt = input.trim();
     if (!prompt || isGenerating) return;
-
     setInput('');
     onSubmit(prompt);
-
     requestAnimationFrame(() => {
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
+      if (textareaRef.current) textareaRef.current.style.height = 'auto';
     });
   }, [input, isGenerating, onSubmit]);
 
+  const hasInput = input.trim().length > 0;
+
   return (
     <section aria-label="Chat" className="flex flex-col h-full">
-      {/* Messages area */}
+      {/* Messages */}
       <div
         ref={scrollRef}
         role="log"
         aria-label="Chat messages"
         aria-live="polite"
-        className="flex-1 overflow-y-auto px-4 py-5"
+        className="flex-1 overflow-y-auto"
       >
         {messages.length === 0 && !isGenerating ? (
-          <div className="flex flex-col items-center justify-center h-full px-4">
-            {/* Hero */}
-            <div className="mb-10 text-center">
-              {/* Glowing orb */}
-              <div className="relative mx-auto mb-6 w-16 h-16">
-                <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600
-                               opacity-20 blur-xl animate-float" />
-                <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600
-                               flex items-center justify-center shadow-lg shadow-indigo-500/20 ring-1 ring-white/10">
-                  <svg className="w-8 h-8 text-white/90" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                       strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                  </svg>
-                </div>
+          <div className="flex flex-col items-center justify-center h-full px-6">
+            <div className="mb-8 text-center">
+              <div className="w-10 h-10 rounded-full bg-[#1a1a24] border border-[#2a2a34]
+                             flex items-center justify-center mx-auto mb-4">
+                <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
               </div>
-
-              <h2 className="text-2xl font-bold tracking-tight mb-2">
-                <span className="bg-gradient-to-r from-zinc-100 via-zinc-100 to-indigo-300 bg-clip-text text-transparent">
-                  ShaderLLM
-                </span>
-              </h2>
-              <p className="text-zinc-500 text-sm max-w-[260px] mx-auto leading-relaxed">
-                Describe a visual effect and watch it come alive in real-time
+              <h2 className="text-lg font-semibold text-zinc-200 mb-1">ShaderLLM</h2>
+              <p className="text-[13px] text-zinc-500 leading-relaxed">
+                Describe a visual effect to generate a shader.
               </p>
             </div>
 
-            {/* Example prompts */}
-            <div className="flex flex-col gap-2 w-full max-w-sm" role="list" aria-label="Example prompts">
-              {EXAMPLE_PROMPTS.map((prompt, i) => (
+            <div className="grid grid-cols-2 gap-2 w-full max-w-sm" role="list" aria-label="Example prompts">
+              {EXAMPLE_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   role="listitem"
-                  onClick={() => {
-                    setInput(prompt);
-                    textareaRef.current?.focus();
-                  }}
-                  className="group text-left text-[13px] px-4 py-3 rounded-xl
-                             bg-white/[0.03] border border-white/[0.06]
-                             text-zinc-400 hover:text-zinc-200
-                             hover:bg-white/[0.06] hover:border-indigo-500/20
-                             active:bg-white/[0.08]
-                             transition-all duration-200
-                             hover:shadow-md hover:shadow-indigo-500/5"
-                  style={{ animationDelay: `${i * 60}ms` }}
+                  onClick={() => { setInput(prompt); textareaRef.current?.focus(); }}
+                  className="text-left text-[12px] leading-snug px-3 py-2.5 rounded-xl
+                             bg-[#1e1e26] border border-[#2a2a34] text-zinc-400
+                             hover:bg-[#252530] hover:text-zinc-300 hover:border-[#3a3a44]
+                             transition-colors duration-150"
                 >
-                  <span className="text-indigo-400/60 group-hover:text-indigo-400 mr-2 transition-colors" aria-hidden="true">&rarr;</span>
                   {prompt}
                 </button>
               ))}
@@ -139,89 +115,83 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
                 />
               );
             })}
-            {isGenerating && <ThinkingIndicator text={thinkingText} retryCount={retryCount} />}
+            {isGenerating && <ThinkingIndicator text={thinkingText} streamingText={streamingText} retryCount={retryCount} />}
           </div>
         )}
       </div>
 
       {/* Input area */}
-      <form
-        onSubmit={handleSubmit}
-        className="p-3 bg-[#0c0c10]/80 backdrop-blur-sm border-t border-white/[0.06]"
-        aria-label="Send a message"
-      >
-        <div className="relative">
+      <div className="px-4 pb-4 pt-2">
+        <form
+          onSubmit={handleSubmit}
+          aria-label="Send a message"
+          className="rounded-2xl bg-[#1e1e26] border border-[#2e2e38]
+                     focus-within:border-[#4a4a58]
+                     transition-colors duration-200 shadow-lg shadow-black/20"
+        >
           <label htmlFor="shader-prompt" className="sr-only">Describe a shader</label>
           <textarea
             id="shader-prompt"
             ref={textareaRef}
             value={input}
-            onChange={(e) => {
-              setInput(e.target.value);
-              adjustHeight();
-            }}
+            onChange={(e) => { setInput(e.target.value); adjustHeight(); }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e); }
             }}
-            placeholder="Describe a shader..."
+            placeholder="Message ShaderLLM..."
             disabled={isGenerating}
             rows={1}
-            className="w-full px-4 py-3 pr-20 rounded-xl
-                       bg-white/[0.04] border border-white/[0.08]
-                       text-zinc-100 text-sm placeholder-zinc-600
+            className="w-full px-4 pt-3 pb-2 text-[14px] text-zinc-100
+                       placeholder-zinc-500 bg-transparent
                        outline-none resize-none leading-relaxed
-                       focus:border-indigo-500/30 focus:bg-white/[0.06]
-                       focus:shadow-[0_0_0_3px_rgba(99,102,241,0.08)]
-                       disabled:opacity-40
-                       transition-all duration-200"
+                       disabled:opacity-40"
             style={{ maxHeight: 160 }}
           />
 
-          {/* Send/Stop button inside textarea */}
-          <div className="absolute right-2 bottom-2">
+          {/* Bottom bar — not overlapping textarea */}
+          <div className="flex items-center justify-between px-3 pb-2">
+            <p className="text-[11px] text-zinc-600 pl-1 select-none" aria-hidden="true">
+              <kbd className="font-mono text-zinc-500">Enter</kbd>
+              <span className="mx-1 text-zinc-700">send</span>
+              <kbd className="font-mono text-zinc-500">Shift+Enter</kbd>
+              <span className="ml-1 text-zinc-700">newline</span>
+            </p>
+
             {isGenerating ? (
               <button
                 type="button"
                 onClick={onAbort}
                 aria-label="Stop generation"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold
-                           bg-red-500/20 text-red-400 border border-red-500/20
-                           hover:bg-red-500/30 hover:text-red-300
-                           transition-all duration-150"
+                className="w-8 h-8 rounded-full flex items-center justify-center
+                           bg-zinc-100 text-zinc-900
+                           hover:bg-white transition-colors duration-150"
               >
-                Stop
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
               </button>
             ) : (
               <button
                 type="submit"
-                disabled={!input.trim()}
+                disabled={!hasInput}
                 aria-label="Send message"
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold
-                           bg-gradient-to-r from-indigo-500 to-violet-500
-                           text-white shadow-md shadow-indigo-500/20
-                           hover:shadow-lg hover:shadow-indigo-500/30
-                           disabled:opacity-25 disabled:cursor-not-allowed disabled:shadow-none
-                           disabled:from-zinc-600 disabled:to-zinc-600
-                           transition-all duration-150"
+                className={`w-8 h-8 rounded-full flex items-center justify-center
+                           transition-all duration-150
+                           ${hasInput
+                             ? 'bg-zinc-100 text-zinc-900 hover:bg-white shadow-sm'
+                             : 'bg-[#2a2a34] text-zinc-600 cursor-not-allowed'
+                           }`}
               >
-                Send
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5" />
+                  <polyline points="5 12 12 5 19 12" />
+                </svg>
               </button>
             )}
           </div>
-        </div>
-
-        {/* Keyboard hints */}
-        <p className="text-[11px] text-zinc-600 mt-1.5 px-1" aria-hidden="true">
-          <kbd className="px-1 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-500 font-mono text-[10px]">Enter</kbd>
-          {' '}send
-          {' '}&middot;{' '}
-          <kbd className="px-1 py-0.5 rounded bg-white/[0.04] border border-white/[0.06] text-zinc-500 font-mono text-[10px]">Shift+Enter</kbd>
-          {' '}new line
-        </p>
-      </form>
+        </form>
+      </div>
     </section>
   );
 }

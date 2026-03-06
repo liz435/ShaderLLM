@@ -29,6 +29,7 @@ interface SessionContextValue {
   // Generation state
   isGenerating: boolean;
   events: SSEEvent[];
+  streamingText: string;
   validationResult: ValidationResult | null;
   retryCount: number;
   error: string | null;
@@ -140,6 +141,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         refreshSessionList,
         isGenerating: gen.isGenerating,
         events: gen.events,
+        streamingText: gen.streamingText,
         validationResult: gen.validationResult,
         retryCount: gen.retryCount,
         error: gen.error,

@@ -34,7 +34,7 @@ export default function App() {
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   // Resizable panel
-  const [panelWidth, setPanelWidth] = useState(420);
+  const [panelWidth, setPanelWidth] = useState(520);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -195,8 +195,8 @@ export default function App() {
           className="min-w-[320px] flex flex-col bg-[#0e0e12] relative"
           aria-label="Chat and shader editor"
         >
-          {/* Subtle right edge glow */}
-          <div className="absolute top-0 right-0 bottom-0 w-px bg-white/[0.04]" aria-hidden="true" />
+          {/* Right edge */}
+          <div className="absolute top-0 right-0 bottom-0 w-px bg-[#2a2a32]" aria-hidden="true" />
 
           {/* Chat area */}
           <div className="flex-1 min-h-0">
@@ -210,10 +210,10 @@ export default function App() {
           {/* Shader editor */}
           <div className="h-70 flex flex-col relative">
             {/* Top separator with gradient */}
-            <div className="h-px bg-gradient-to-r from-indigo-500/20 via-white/[0.06] to-transparent" aria-hidden="true" />
+            <div className="h-px bg-[#2a2a32]" aria-hidden="true" />
 
             {/* Editor header */}
-            <div className="flex items-center justify-between px-3 py-2 bg-[#0c0c10]">
+            <div className="flex items-center justify-between px-3 py-2 bg-[#141418] border-b border-[#2a2a32]">
               <div className="flex items-center gap-2.5">
                 {(shader || editorCode) && (
                   <span
@@ -241,8 +241,8 @@ export default function App() {
                 <button
                   onClick={handleUndo}
                   disabled={!history.canUndo}
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
+                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
                   aria-label="Undo"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -252,8 +252,8 @@ export default function App() {
                 <button
                   onClick={handleRedo}
                   disabled={!history.canRedo}
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
+                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
                   aria-label="Redo"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -265,8 +265,8 @@ export default function App() {
                 <button
                   onClick={handleCopyShader}
                   disabled={!(shader || editorCode)}
-                  className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-300 hover:bg-white/[0.06]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-all duration-150"
+                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
+                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
                   aria-label="Copy shader code"
                 >
                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -274,16 +274,16 @@ export default function App() {
                   </svg>
                 </button>
 
-                <span className="w-px h-4 bg-white/[0.06] mx-1" aria-hidden="true" />
+                <span className="w-px h-4 bg-[#2a2a32] mx-1" aria-hidden="true" />
 
                 {/* Compile button — visible when editing */}
                 {!editorReadOnly && (
                   <button
                     onClick={handleCompile}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold
-                               text-emerald-400 bg-emerald-500/10 border border-emerald-500/20
-                               hover:bg-emerald-500/15 hover:border-emerald-500/30
-                               transition-all duration-150"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold
+                               text-emerald-400 bg-emerald-950 border border-emerald-800
+                               hover:bg-emerald-900 hover:border-emerald-700
+                               transition-colors duration-150"
                     aria-label="Compile shader (Ctrl+S)"
                   >
                     <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
@@ -301,8 +301,8 @@ export default function App() {
                   className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg
                     transition-all duration-150
                     ${editorReadOnly
-                      ? 'text-zinc-500 bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.06] hover:text-zinc-300'
-                      : 'text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 hover:bg-indigo-500/15'
+                      ? 'text-zinc-400 bg-[#1e1e26] border border-[#2a2a34] hover:bg-[#252530] hover:text-zinc-300'
+                      : 'text-indigo-300 bg-indigo-950 border border-indigo-800 hover:bg-indigo-900'
                     }`}
                 >
                   {editorReadOnly ? (

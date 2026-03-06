@@ -1,0 +1,37 @@
+[
+  {
+    "file": "sunset_water.glsl",
+    "prompt": "a sunset over water",
+    "tags": ["sunset", "water", "ocean", "sea", "sky", "reflection", "nature", "landscape", "horizon", "lake", "beach"]
+  },
+  {
+    "file": "neon_orb.glsl",
+    "prompt": "glowing orbital rope with particle points",
+    "tags": ["orb", "orbit", "particle", "glow", "rope", "energy", "abstract", "neon", "circle", "loop", "point", "motion", "electric"]
+  },
+  {
+    "file": "grass_field.glsl",
+    "prompt": "grass blowing in the wind",
+    "tags": ["grass", "field", "nature", "wind", "terrain", "green", "landscape", "meadow", "lawn", "ground", "vegetation", "plant"]
+  },
+  {
+    "file": "fire_flames.glsl",
+    "prompt": "realistic fire and flames",
+    "tags": ["fire", "flame", "flames", "burning", "hot", "warm", "emissive", "torch", "campfire", "inferno", "heat", "lava"]
+  },
+  {
+    "file": "spiral_tunnel.glsl",
+    "prompt": "hypnotic spiral tunnel with rainbow colors",
+    "tags": ["tunnel", "spiral", "hypnotic", "abstract", "rainbow", "psychedelic", "vortex", "trippy", "warp", "portal", "colorful"]
+  },
+  {
+    "file": "corridor_raymarched.glsl",
+    "prompt": "abstract corridor with flat-shaded mesh look",
+    "tags": ["corridor", "tunnel", "raymarching", "raymarch", "abstract", "3d", "hallway", "sdf", "lighting", "ao", "ambient-occlusion", "curvature", "bump-mapping", "procedural"]
+  },
+  {
+    "file": "ocean_waves.glsl",
+    "prompt": "realistic ocean with waves and atmosphere",
+    "tags": ["ocean", "water", "waves", "sea", "realistic", "atmosphere", "sun", "fresnel", "raymarching", "scattering", "reflection", "beach", "lake", "river"]
+  }
+]

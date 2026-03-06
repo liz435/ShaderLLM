@@ -10,6 +10,7 @@ export interface ShaderGenerationState {
   setShader: (shader: string | null) => void;
   isGenerating: boolean;
   events: SSEEvent[];
+  streamingText: string;
   validationResult: ValidationResult | null;
   retryCount: number;
   error: string | null;
@@ -21,6 +22,7 @@ export function useShaderGeneration(): ShaderGenerationState {
   const [shader, setShader] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [events, setEvents] = useState<SSEEvent[]>([]);
+  const [streamingText, setStreamingText] = useState('');
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +30,13 @@ export function useShaderGeneration(): ShaderGenerationState {
   const controllerRef = useRef<AbortController | null>(null);
 
   const handleEvent = useCallback((type: SSEEventType, data: Record<string, unknown>) => {
+    // Don't add text_delta to the events array (too many, would cause excessive re-renders)
+    if (type === 'text_delta') {
+      const text = data.text as string || '';
+      setStreamingText((prev) => prev + text);
+      return;
+    }
+
     const event: SSEEvent = { type, data, timestamp: Date.now() };
     setEvents((prev) => [...prev, event]);
 
@@ -42,6 +51,8 @@ export function useShaderGeneration(): ShaderGenerationState {
         break;
       case 'repair_attempt':
         setRetryCount(data.attempt as number || 0);
+        // Clear streaming text for next LLM call (repair)
+        setStreamingText('');
         break;
       case 'error':
         setError(data.message as string || 'Unknown error');
@@ -60,6 +71,7 @@ export function useShaderGeneration(): ShaderGenerationState {
 
       setIsGenerating(true);
       setEvents([]);
+      setStreamingText('');
       setError(null);
       setRetryCount(0);
       setValidationResult(null);
@@ -118,6 +130,7 @@ export function useShaderGeneration(): ShaderGenerationState {
     setShader,
     isGenerating,
     events,
+    streamingText,
     validationResult,
     retryCount,
     error,

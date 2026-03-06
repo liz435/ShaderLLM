@@ -7,10 +7,12 @@ from pydantic import BaseModel, Field
 class SSEEvent(BaseModel):
     type: Literal[
         "thinking",
+        "text_delta",
         "shader_code",
         "validation",
         "repair_start",
         "repair_attempt",
+        "clarification",
         "error",
         "done",
     ]
