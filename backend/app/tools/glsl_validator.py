@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import subprocess
@@ -7,6 +8,8 @@ from typing import Literal
 from pydantic import BaseModel
 
 from app.config import settings
+
+log = logging.getLogger(__name__)
 
 
 class ValidationError(BaseModel):
@@ -88,22 +91,40 @@ def validate_glsl(source: str, stage: Literal["vertex", "fragment"]) -> Validati
 
 
 def _fallback_validate(source: str, stage: Literal["vertex", "fragment"]) -> ValidationResult:
-    """Basic regex-based checks when glslangValidator is not available."""
+    """Basic regex-based checks when glslangValidator is not available.
+
+    WARNING: This only catches gross structural errors (missing main, unmatched braces).
+    Type errors, undeclared variables, and invalid syntax will pass through unchecked.
+    Install glslangValidator for real validation.
+    """
+    log.warning(
+        "glslangValidator not found — using degraded fallback validation. "
+        "Install glslang-tools for proper GLSL compilation checks."
+    )
+
     errors: list[ValidationError] = []
+
+    # Always add a warning so consumers know this was fallback-checked
+    errors.append(ValidationError(
+        line=0,
+        message="Validation degraded: glslangValidator not installed. Only basic checks performed.",
+        severity="warning",
+        stage=stage,
+    ))
 
     if "void main" not in source:
         errors.append(ValidationError(
             line=0, message="Missing void main() function", severity="error", stage=stage
         ))
 
-    # Check for unclosed braces
     if source.count("{") != source.count("}"):
         errors.append(ValidationError(
             line=0, message="Mismatched curly braces", severity="error", stage=stage
         ))
 
+    has_errors = any(e.severity == "error" for e in errors)
     return ValidationResult(
-        valid=len(errors) == 0,
+        valid=not has_errors,
         errors=errors,
         raw_output="fallback validation (glslangValidator not found)",
     )

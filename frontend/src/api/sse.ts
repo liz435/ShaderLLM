@@ -31,6 +31,8 @@ export function connectSSE(
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let currentEvent = '';
+      let doneFired = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -40,7 +42,6 @@ export function connectSSE(
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
-        let currentEvent = '';
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             currentEvent = line.slice(7).trim();
@@ -49,7 +50,10 @@ export function connectSSE(
               const data = JSON.parse(line.slice(6));
               if (currentEvent === 'done') {
                 callbacks.onEvent('done', data);
-                callbacks.onDone();
+                if (!doneFired) {
+                  doneFired = true;
+                  callbacks.onDone();
+                }
               } else {
                 callbacks.onEvent(currentEvent as SSEEventType, data);
               }
@@ -62,7 +66,10 @@ export function connectSSE(
       }
 
       // Stream ended naturally
-      callbacks.onDone();
+      if (!doneFired) {
+        doneFired = true;
+        callbacks.onDone();
+      }
     })
     .catch((err: Error) => {
       if (err.name !== 'AbortError') {

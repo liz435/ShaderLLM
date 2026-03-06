@@ -10,10 +10,10 @@ interface ChatPanelProps {
 }
 
 const EXAMPLE_PROMPTS = [
-  'A pulsing neon circle on a dark background',
-  'Ocean waves with foam and sunlight',
-  'Hypnotic spiral tunnel with RGB shift',
-  'Perlin noise terrain with coloring',
+  'Volumetric fire',
+  'Ocean waves at sunset',
+  'Abstract spiral tunnel',
+  'Neon orbital particles',
 ];
 
 export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanelProps) {
@@ -30,7 +30,7 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
     const el = textareaRef.current;
     if (!el) return;
     el.style.height = 'auto';
-    el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+    el.style.height = Math.min(el.scrollHeight, 144) + 'px';
   }, []);
 
   useEffect(() => {
@@ -70,29 +70,24 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
         {messages.length === 0 && !isGenerating ? (
           <div className="flex flex-col items-center justify-center h-full px-6">
             <div className="mb-8 text-center">
-              <div className="w-10 h-10 rounded-full bg-[#1a1a24] border border-[#2a2a34]
-                             flex items-center justify-center mx-auto mb-4">
-                <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-zinc-200 mb-1">ShaderLLM</h2>
-              <p className="text-[13px] text-zinc-500 leading-relaxed">
-                Describe a visual effect to generate a shader.
+              <h2 className="text-[15px] font-medium text-zinc-300 mb-1.5">
+                What should we build?
+              </h2>
+              <p className="text-[13px] text-zinc-600 leading-relaxed">
+                Describe a visual effect or pick one below.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 w-full max-w-sm" role="list" aria-label="Example prompts">
+            <div className="flex flex-wrap justify-center gap-2 max-w-sm" role="list" aria-label="Example prompts">
               {EXAMPLE_PROMPTS.map((prompt) => (
                 <button
                   key={prompt}
                   role="listitem"
                   onClick={() => { setInput(prompt); textareaRef.current?.focus(); }}
-                  className="text-left text-[12px] leading-snug px-3 py-2.5 rounded-xl
-                             bg-[#1e1e26] border border-[#2a2a34] text-zinc-400
-                             hover:bg-[#252530] hover:text-zinc-300 hover:border-[#3a3a44]
-                             transition-colors duration-150"
+                  className="text-[13px] px-3.5 py-1.5 rounded-full
+                             bg-white/[0.04] border border-white/[0.06] text-zinc-500
+                             hover:bg-white/[0.08] hover:text-zinc-300 hover:border-white/[0.1]
+                             transition-all duration-150"
                 >
                   {prompt}
                 </button>
@@ -120,14 +115,14 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
         )}
       </div>
 
-      {/* Input area */}
-      <div className="px-4 pb-4 pt-2">
+      {/* Input */}
+      <div className="px-3 pb-3 pt-1">
         <form
           onSubmit={handleSubmit}
           aria-label="Send a message"
-          className="rounded-2xl bg-[#1e1e26] border border-[#2e2e38]
-                     focus-within:border-[#4a4a58]
-                     transition-colors duration-200 shadow-lg shadow-black/20"
+          className="rounded-xl bg-white/[0.04] border border-white/[0.06]
+                     focus-within:border-white/[0.12]
+                     transition-colors duration-200"
         >
           <label htmlFor="shader-prompt" className="sr-only">Describe a shader</label>
           <textarea
@@ -138,35 +133,31 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(e); }
             }}
-            placeholder="Message ShaderLLM..."
+            placeholder="Describe a shader..."
             disabled={isGenerating}
             rows={1}
-            className="w-full px-4 pt-3 pb-2 text-[14px] text-zinc-100
-                       placeholder-zinc-500 bg-transparent
+            className="w-full px-3.5 pt-2.5 pb-1 text-[14px] text-zinc-200
+                       placeholder-zinc-600 bg-transparent
                        outline-none resize-none leading-relaxed
-                       disabled:opacity-40"
-            style={{ maxHeight: 160 }}
+                       disabled:opacity-30"
+            style={{ maxHeight: 144 }}
           />
 
-          {/* Bottom bar — not overlapping textarea */}
-          <div className="flex items-center justify-between px-3 pb-2">
-            <p className="text-[11px] text-zinc-600 pl-1 select-none" aria-hidden="true">
-              <kbd className="font-mono text-zinc-500">Enter</kbd>
-              <span className="mx-1 text-zinc-700">send</span>
-              <kbd className="font-mono text-zinc-500">Shift+Enter</kbd>
-              <span className="ml-1 text-zinc-700">newline</span>
-            </p>
+          <div className="flex items-center justify-between px-2.5 pb-2">
+            <span className="text-[10px] text-zinc-700 select-none" aria-hidden="true">
+              Enter to send
+            </span>
 
             {isGenerating ? (
               <button
                 type="button"
                 onClick={onAbort}
                 aria-label="Stop generation"
-                className="w-8 h-8 rounded-full flex items-center justify-center
-                           bg-zinc-100 text-zinc-900
+                className="w-7 h-7 rounded-full flex items-center justify-center
+                           bg-zinc-200 text-zinc-900
                            hover:bg-white transition-colors duration-150"
               >
-                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
                   <rect x="6" y="6" width="12" height="12" rx="2" />
                 </svg>
               </button>
@@ -175,14 +166,14 @@ export default function ChatPanel({ onSubmit, isGenerating, onAbort }: ChatPanel
                 type="submit"
                 disabled={!hasInput}
                 aria-label="Send message"
-                className={`w-8 h-8 rounded-full flex items-center justify-center
+                className={`w-7 h-7 rounded-full flex items-center justify-center
                            transition-all duration-150
                            ${hasInput
-                             ? 'bg-zinc-100 text-zinc-900 hover:bg-white shadow-sm'
-                             : 'bg-[#2a2a34] text-zinc-600 cursor-not-allowed'
+                             ? 'bg-zinc-200 text-zinc-900 hover:bg-white'
+                             : 'bg-white/[0.04] text-zinc-700/40 cursor-not-allowed'
                            }`}
               >
-                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="12" y1="19" x2="12" y2="5" />
                   <polyline points="5 12 12 5 19 12" />

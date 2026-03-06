@@ -82,23 +82,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const sendMessage = useCallback(
     (prompt: string) => {
-      // Add user message
       const userMsg: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'user',
         content: prompt,
         timestamp: Date.now(),
       };
-      setMessages((prev) => [...prev, userMsg]);
 
-      // Decide generate vs refine
-      if (gen.shader) {
-        gen.refine(prompt, gen.shader, messages, gen.conversationId);
-      } else {
-        gen.generate(prompt, gen.conversationId);
-      }
+      setMessages((prev) => {
+        const updated = [...prev, userMsg];
+
+        // Decide generate vs refine — use `updated` so the current
+        // user message is included in the history sent to the backend.
+        if (gen.shader) {
+          gen.refine(prompt, gen.shader, updated, gen.conversationId);
+        } else {
+          gen.generate(prompt, gen.conversationId);
+        }
+
+        return updated;
+      });
     },
-    [gen, messages]
+    [gen]
   );
 
   const startNewSession = useCallback(() => {

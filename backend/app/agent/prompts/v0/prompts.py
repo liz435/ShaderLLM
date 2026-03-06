@@ -1,4 +1,39 @@
-"""All LLM prompts in one place. Separated by concern: generation, DSL generation, repair, refinement."""
+"""All LLM prompts in one place. Separated by concern: generation, DSL generation, repair, refinement.
+
+Shared blocks (header, noise helpers) are defined once and composed into each prompt.
+"""
+
+# ──────────────────────────────────────────────
+# SHARED BLOCKS — reused across prompts
+# ──────────────────────────────────────────────
+
+GLSL_HEADER_BLOCK = """#version 300 es
+precision highp float;
+uniform float iTime;
+uniform vec2 iResolution;
+uniform vec4 iMouse;
+out vec4 fragColor;"""
+
+NOISE_HELPERS_BLOCK = """float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+float fbm(vec2 p) {
+    float v = 0.0, a = 0.5;
+    for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.0; a *= 0.5; }
+    return v;
+}"""
+
+TECHNICAL_RULES_BLOCK = """- The shader must compile in WebGL2 / GLSL ES 3.00
+- No deprecated syntax (no gl_FragColor, no attribute, no varying)
+- Use float literals (1.0 not 1, 0.5 not 1/2)
+- No textures, no external buffers, no extra uniforms beyond iTime, iResolution, iMouse
+- GLSL ES has no built-in noise(). Implement all helpers inline above main()
+- fbm at most 4 octaves
+- End with: fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);"""
 
 # ──────────────────────────────────────────────
 # CLARITY CHECK PROMPT
@@ -92,6 +127,15 @@ Pick the simplest technique that satisfies the prompt at high quality.
 Do NOT default to the cheapest option if it looks flat.
 Do NOT force 3D if 2D or 2.5D can convincingly solve it.
 
+Classification-to-technique binding (MANDATORY):
+  2.5D + nature (grass, rain, snow, forest) → Ray-plane intersection / layered geometry
+  2.5D + water (ocean, lake, river)         → Wave functions + surface tracing
+  3D + enclosed space (tunnel, corridor)     → Ray marching + SDF
+  3D + atmosphere (fire, clouds, nebula)     → Volumetric ray marching
+  2D + geometric (orb, logo, portal)         → 2D SDF composition
+  2D + abstract (spiral, mandala, warp)      → Polar / domain transforms
+If your classification matches a row above, you MUST use that technique.
+
 Ray marching + SDF (3D, realistic or stylized):
   Best for: tunnels, caves, architecture, abstract sculptures, corridors
   Pattern: camera → ray direction → march loop → SDF map → normal → lighting
@@ -153,6 +197,56 @@ Convert vague artistic language into concrete visible actions:
 Express all layers in code, not just in reasoning.
 
 ────────────────────────────────────────────────────
+COMMON MISTAKES — BAD vs GOOD (STUDY THESE)
+────────────────────────────────────────────────────
+
+Grass / vegetation:
+  BAD:  vec3 col = vec3(0.1, 0.5, 0.1) * fbm(uv * 3.0);  // flat green blob
+  GOOD: Ray-plane intersection loop with per-blade shape function:
+        for(int i = 0; i < BLADES; i++) {
+            float z = -(float(BLADES - i) * 0.1 + 1.0);
+            float pt = (z - ro.z) / rd.z;
+            vec2 tc = ro.xy + rd.xy * pt;
+            // per-cell blade shape with sway
+            tc.x += pow(1.0 + tc.y, 2.0) * 0.1 * cos(x * 0.5 + iTime);
+            vec4 blade = grass(tc, seed);
+            col = mix(col, blade.rgb, blade.a);
+        }
+
+Water / ocean:
+  BAD:  vec3 col = vec3(0.0, 0.2, 0.6) * noise(uv * 5.0 + iTime);  // blue noise field
+  GOOD: Layered wave functions → analytical normals → fresnel + reflection:
+        float h = 0.0;
+        for(int i = 0; i < 4; i++) {
+            h += amp * sin(dot(dir, p.xz) * freq + iTime * speed);
+            // accumulate wave height + normal derivatives
+        }
+        vec3 n = normalize(vec3(-dhdx, 1.0, -dhdz));
+        float fresnel = pow(1.0 - max(dot(n, viewDir), 0.0), 5.0);
+
+Fire / flames:
+  BAD:  vec3 col = mix(vec3(1.0, 0.3, 0.0), vec3(1.0, 0.8, 0.0), uv.y);  // static gradient
+  GOOD: Volumetric density accumulation with emissive ramp:
+        for(int i = 0; i < STEPS; i++) {
+            float density = fbm(pos.xz * 3.0 - vec2(0.0, iTime * 2.0));
+            density *= smoothstep(1.0, 0.0, pos.y);  // fade at top
+            vec3 emit = mix(vec3(0.5,0.0,0.0), vec3(1.0,0.9,0.2), density);
+            col += emit * density * (1.0 - opacity);
+            opacity += density * step_size;
+        }
+
+Terrain / landscapes:
+  BAD:  vec3 col = vec3(0.3, 0.5, 0.2);  // single flat color
+  GOOD: Heightfield with normal-based shading and depth fog:
+        float h = fbm(p.xz * 0.5);
+        vec3 n = normalize(vec3(h - fbm((p.xz + vec2(e,0)) * 0.5), e, ...));
+        float diffuse = max(dot(n, sunDir), 0.0);
+        col = mix(col, fogColor, smoothstep(0.0, maxDist, dist));
+
+General rule: if the result would look like a flat colored rectangle at arm's length,
+it is wrong. Natural scenes need spatial structure, depth cues, and variation.
+
+────────────────────────────────────────────────────
 NOISE + HELPERS
 ────────────────────────────────────────────────────
 GLSL ES has no built-in noise(). Implement all helpers inline above main().
@@ -160,26 +254,7 @@ Use at most 4 octaves for fbm. Avoid deeply nested loops.
 
 Required baseline helpers — copy and extend as needed:
 
-float hash(vec2 p) {
-    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise(vec2 p) {
-    vec2 i = floor(p), f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    float a = hash(i), b = hash(i + vec2(1.0, 0.0));
-    float c = hash(i + vec2(0.0, 1.0)), d = hash(i + vec2(1.0, 1.0));
-    return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
-float fbm(vec2 p) {
-    float v = 0.0, a = 0.5;
-    for (int i = 0; i < 4; i++) {
-        v += a * noise(p);
-        p *= 2.0; a *= 0.5;
-    }
-    return v;
-}
+""" + NOISE_HELPERS_BLOCK + """
 
 Any helper you call MUST be defined above main(). Never call undefined helpers.
 
@@ -189,24 +264,16 @@ TECHNICAL REQUIREMENTS (NON-NEGOTIABLE)
 Generate a valid WebGL2 GLSL ES 3.00 fragment shader. It must compile without errors.
 
 Required header (use exactly):
-#version 300 es
-precision highp float;
-uniform float iTime;
-uniform vec2 iResolution;
-uniform vec4 iMouse;
-out vec4 fragColor;
+""" + GLSL_HEADER_BLOCK + """
 
 Rules:
 - Use gl_FragCoord.xy for pixel coordinates
-- Use float literals (1.0 not 1; 0.5 not 1/2) — integer literals cause type errors
-- No textures, no external buffers, no extra uniforms beyond the four above
-- No deprecated syntax (no gl_FragColor, no attribute, no varying)
+""" + TECHNICAL_RULES_BLOCK + """
 - Only use iMouse if the user explicitly asks for interactivity
-- Final color must be clamped: fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 
 Complexity tiers — choose the right one for the prompt:
-  Simple (30–60 lines): clean 2D shapes, minimal abstractions, subtle effects
-  Moderate (60–120 lines): layered 2D/2.5D, fbm-based effects, surface shading
+  Simple (60-100 lines): clean 2D shapes, minimal abstractions, subtle effects
+  Moderate (100-150 lines): layered 2D/2.5D, fbm-based effects, surface shading
   Complex (120–200 lines): full ray marching, volumetric rendering, multi-pass layering
 Do not reach for Complex unless the subject genuinely requires it.
 
@@ -219,13 +286,25 @@ Classification: [2D|2.5D|3D] + [realistic|stylized|abstract]
 Technique: [chosen technique and why it fits this prompt]
 Complexity: [simple|moderate|complex] — [one sentence justifying the choice]
 Palette: [2–4 specific colors and their roles, e.g. "deep blue (#0a1a3a) for void, cyan (#00f0ff) for glow"]
-Layers:
-- Background: [what it renders and how]
-- Primary Subject: [main form or scene content]
-- Secondary Detail: [supporting forms, distortion, repetition, or breakup]
-- Atmosphere: [glow, fog, fresnel, particles, or shading — or "none" if minimal]
-Motion: [what moves, what stays stable, how motion is driven — or "none" if static]
+Structure:
+- Base Form: [core field/geometry/pattern — e.g. wave surface, SDF tunnel, radial bands, density field]
+- Secondary Structure: [supporting repeated forms, masks, distortions, or layered elements — or "none"]
+- Detail: [noise, fbm, edge breakup, micro-variation, ripples, texture logic — or "minimal"]
+- Shading/Color: [how color, glow, fog, fresnel, contrast, or lighting are produced]
+Motion:
+- [what moves, what remains stable, and which parameters drive the motion — or "none" if static]
 </reasoning>
+
+────────────────────────────────────────────────────
+SELF-CHECK (VERIFY IN YOUR HEAD BEFORE OUTPUT)
+────────────────────────────────────────────────────
+Before writing the code block, mentally confirm ALL of these:
+- Does the shader have spatial structure (not a flat color field)?
+- Are there at least 2 distinct visual layers composited together?
+- Does motion look intentional and tied to the subject (not random noise drift)?
+- Does the technique match the classification-to-technique binding above?
+- Would this look compelling as a Shadertoy thumbnail, not a solid rectangle?
+If any answer is NO, revise your approach before outputting code.
 
 ────────────────────────────────────────────────────
 OUTPUT FORMAT (STRICT)
@@ -410,26 +489,12 @@ FIX STRATEGY
 ────────────────────────────────────────────────────
 REQUIRED HEADER (do not remove or alter)
 ────────────────────────────────────────────────────
-#version 300 es
-precision highp float;
-
-uniform float iTime;
-uniform vec2 iResolution;
-uniform vec4 iMouse;
-
-out vec4 fragColor;
+""" + GLSL_HEADER_BLOCK + """
 
 ────────────────────────────────────────────────────
 NOISE HELPER (use if a missing noise function is the error)
 ────────────────────────────────────────────────────
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p) {
-    vec2 i = floor(p);
-    vec2 f = fract(p);
-    f = f * f * (3.0 - 2.0 * f);
-    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
-               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
-}
+""" + NOISE_HELPERS_BLOCK + """
 
 ────────────────────────────────────────────────────
 OUTPUT FORMAT
@@ -464,28 +529,15 @@ MODIFICATION RULES
 - Preserve everything the user did not ask to change (colors, motion, structure)
 - If adding new visual elements, integrate them using mix/add/screen compositing
 - Maintain all required declarations:
-  #version 300 es
-  precision highp float;
-  uniform float iTime;
-  uniform vec2 iResolution;
-  uniform vec4 iMouse;
-  out vec4 fragColor;
+""" + GLSL_HEADER_BLOCK + """
 
 ────────────────────────────────────────────────────
 TECHNICAL CONSTRAINTS
 ────────────────────────────────────────────────────
-- The shader must compile in WebGL2 / GLSL ES 3.00
-- No deprecated syntax (no gl_FragColor, no attribute, no varying)
-- Use float literals (1.0 not 1, 0.5 not 1/2)
-- GLSL ES has no built-in noise(). If you need noise, implement it inline above main():
-  float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-  float noise(vec2 p) {
-      vec2 i = floor(p), f = fract(p);
-      f = f * f * (3.0 - 2.0 * f);
-      return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-  }
-- fbm at most 4 octaves
-- End with: fragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
+""" + TECHNICAL_RULES_BLOCK + """
+
+If you need noise, implement it inline above main():
+""" + NOISE_HELPERS_BLOCK + """
 
 ────────────────────────────────────────────────────
 REASONING (MANDATORY)

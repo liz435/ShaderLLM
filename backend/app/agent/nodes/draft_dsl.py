@@ -1,11 +1,11 @@
 """Agent node that generates a shader via the DSL intermediate representation."""
 
-import json
 import time
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agent.prompts import DSL_DRAFT_SYSTEM_PROMPT
+from app.agent.error_handling import safe_node
+from backend.app.agent.prompts.v0.prompts import DSL_DRAFT_SYSTEM_PROMPT
 from app.agent.state import AgentState
 from app.agent.utils import extract_dsl_json, extract_reasoning
 from app.dsl.cache import get_cache
@@ -14,6 +14,7 @@ from app.llm.provider import get_llm
 from app.models.events import SSEEvent
 
 
+@safe_node
 async def draft_shader_dsl(state: AgentState) -> dict:
     """Generate a shader by having the LLM produce a DSL spec, then compile to GLSL."""
     llm = get_llm()

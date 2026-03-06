@@ -12,7 +12,6 @@ dependencies = [
     "langchain-openai>=0.2.0",
     "langchain-anthropic>=0.3.0",
     "pydantic-settings>=2.5.0",
-    "webcolors>=24.8.0",
 ]
 
 [project.optional-dependencies]

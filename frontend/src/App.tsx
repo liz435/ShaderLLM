@@ -11,6 +11,7 @@ import { useSession } from './contexts/SessionContext';
 import { useToast } from './contexts/ToastContext';
 import { useShaderHistory } from './hooks/useShaderHistory';
 import { useHotkeys, type HotkeyDef } from './hooks/useHotkeys';
+import { getChangedLines } from './utils/lineDiff';
 import type { CompileResult, ShaderError } from './types';
 import './index.css';
 
@@ -33,22 +34,25 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-  // Resizable panel
-  const [panelWidth, setPanelWidth] = useState(520);
+  const [panelWidth, setPanelWidth] = useState(480);
   const isDragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
-
-  // Canvas ref for imperative compile
   const canvasRef = useRef<ShaderCanvasHandle>(null);
 
-  // Sync shader from generation into editor and history
   useEffect(() => {
     if (shader) {
       setEditorCode(shader);
       history.push(shader);
     }
   }, [shader]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Compute diff between previous and current shader
+  const changedLines = useMemo(() => {
+    if (!history.previous || !editorCode) return undefined;
+    const lines = getChangedLines(history.previous, editorCode);
+    return lines.size > 0 ? lines : undefined;
+  }, [history.previous, editorCode]);
 
   const handleCompileResult = useCallback((result: CompileResult) => {
     setCompileErrors(result.success ? [] : result.errors);
@@ -118,7 +122,16 @@ export default function App() {
     }
   }, [history]);
 
-  // Drag-to-resize
+  const handleRevert = useCallback(() => {
+    const prev = history.undo();
+    if (prev !== null) {
+      setEditorCode(prev);
+      const result = canvasRef.current?.compile(prev);
+      if (result) handleCompileResult(result);
+      toast('Reverted to previous version', 'success');
+    }
+  }, [history, handleCompileResult, toast]);
+
   const handleDragStart = useCallback((e: React.MouseEvent) => {
     isDragging.current = true;
     startX.current = e.clientX;
@@ -159,7 +172,6 @@ export default function App() {
     }
   }, []);
 
-  // Global keyboard shortcuts
   const hotkeys: HotkeyDef[] = useMemo(() => [
     { key: 's', ctrl: true, handler: handleCompile, description: 'Compile shader' },
     { key: 'e', ctrl: true, handler: () => setEditorReadOnly((r) => !r), description: 'Toggle editor lock' },
@@ -177,8 +189,12 @@ export default function App() {
 
   useHotkeys(hotkeys);
 
+  const iconBtn = `p-1.5 rounded text-zinc-600 hover:text-zinc-300
+                   disabled:opacity-20 disabled:cursor-not-allowed
+                   transition-colors duration-150`;
+
   return (
-    <div className="flex flex-col h-full bg-[#0a0a0c] grain">
+    <div className="flex flex-col h-full bg-[#09090b]">
       <ToolBar
         onReset={handleReset}
         onExport={handleExport}
@@ -189,16 +205,13 @@ export default function App() {
       <div className="flex flex-1 min-h-0">
         <SessionSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-        {/* Left panel: chat + editor */}
+        {/* Left: chat + editor */}
         <aside
           style={{ width: panelWidth }}
-          className="min-w-[320px] flex flex-col bg-[#0e0e12] relative"
+          className="min-w-[320px] flex flex-col bg-[#0a0a0c] relative"
           aria-label="Chat and shader editor"
         >
-          {/* Right edge */}
-          <div className="absolute top-0 right-0 bottom-0 w-px bg-[#2a2a32]" aria-hidden="true" />
 
-          {/* Chat area */}
           <div className="flex-1 min-h-0">
             <ChatPanel
               onSubmit={handleSubmit}
@@ -207,14 +220,13 @@ export default function App() {
             />
           </div>
 
-          {/* Shader editor */}
-          <div className="h-70 flex flex-col relative">
-            {/* Top separator with gradient */}
-            <div className="h-px bg-[#2a2a32]" aria-hidden="true" />
+          {/* Editor */}
+          <div className="h-64 flex flex-col">
+            <div className="h-px bg-white/[0.06]" aria-hidden="true" />
 
-            {/* Editor header */}
-            <div className="flex items-center justify-between px-3 py-2 bg-[#141418] border-b border-[#2a2a32]">
-              <div className="flex items-center gap-2.5">
+            {/* Editor bar */}
+            <div className="flex items-center justify-between px-3 py-2 bg-[#0c0c0e]">
+              <div className="flex items-center gap-2">
                 {(shader || editorCode) && (
                   <span
                     aria-label={
@@ -222,108 +234,94 @@ export default function App() {
                         : compileSuccess ? 'Compiled successfully'
                         : 'Not compiled'
                     }
-                    className={`w-2 h-2 rounded-full shrink-0 transition-colors duration-300
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors duration-300
                       ${compileErrors.length > 0
-                        ? 'bg-red-500 shadow-sm shadow-red-500/40'
+                        ? 'bg-red-500'
                         : compileSuccess
                           ? 'bg-emerald-400 animate-pulse-glow'
-                          : 'bg-zinc-600'
+                          : 'bg-zinc-700'
                       }`}
                   />
                 )}
-                <span className="text-[11px] font-semibold text-zinc-500 tracking-wider uppercase">
-                  Fragment Shader
+                <span className="text-[11px] font-medium text-zinc-500 tracking-wider uppercase">
+                  Fragment
                 </span>
               </div>
 
-              <div className="flex items-center gap-0.5">
-                {/* Undo / Redo */}
-                <button
-                  onClick={handleUndo}
-                  disabled={!history.canUndo}
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
-                  aria-label="Undo"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <div className="flex items-center gap-1">
+                <button onClick={handleUndo} disabled={!history.canUndo} className={iconBtn} aria-label="Undo">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
                   </svg>
                 </button>
-                <button
-                  onClick={handleRedo}
-                  disabled={!history.canRedo}
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
-                  aria-label="Redo"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <button onClick={handleRedo} disabled={!history.canRedo} className={iconBtn} aria-label="Redo">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                   </svg>
                 </button>
 
-                {/* Copy shader */}
-                <button
-                  onClick={handleCopyShader}
-                  disabled={!(shader || editorCode)}
-                  className="p-1.5 rounded-md text-zinc-500 hover:text-zinc-300 hover:bg-[#2a2a32]
-                             disabled:opacity-20 disabled:cursor-not-allowed transition-colors duration-150"
-                  aria-label="Copy shader code"
-                >
-                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                {/* Revert to previous version */}
+                {history.canUndo && changedLines && (
+                  <button
+                    onClick={handleRevert}
+                    className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium
+                               text-amber-400/80 hover:text-amber-300
+                               transition-colors duration-150"
+                    aria-label="Revert to previous version"
+                    title="Revert to previous version"
+                  >
+                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                    </svg>
+                    Revert
+                  </button>
+                )}
+
+                <button onClick={handleCopyShader} disabled={!(shader || editorCode)} className={iconBtn} aria-label="Copy shader">
+                  <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                   </svg>
                 </button>
 
-                <span className="w-px h-4 bg-[#2a2a32] mx-1" aria-hidden="true" />
-
-                {/* Compile button — visible when editing */}
                 {!editorReadOnly && (
-                  <button
-                    onClick={handleCompile}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold
-                               text-emerald-400 bg-emerald-950 border border-emerald-800
-                               hover:bg-emerald-900 hover:border-emerald-700
-                               transition-colors duration-150"
-                    aria-label="Compile shader (Ctrl+S)"
-                  >
-                    <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                      <polygon points="5 3 19 12 5 21" />
-                    </svg>
-                    Compile
-                  </button>
+                  <>
+                    <span className="w-px h-3 bg-white/[0.06] mx-1" aria-hidden="true" />
+                    <button
+                      onClick={handleCompile}
+                      className="px-2 py-0.5 rounded text-[11px] font-medium
+                                 text-emerald-400 hover:text-emerald-300
+                                 transition-colors duration-150"
+                      aria-label="Compile shader"
+                    >
+                      Run
+                    </button>
+                  </>
                 )}
 
-                {/* Lock/Unlock toggle */}
+                <span className="w-px h-3 bg-white/[0.06] mx-1" aria-hidden="true" />
+
                 <button
                   onClick={() => setEditorReadOnly(!editorReadOnly)}
-                  aria-label={editorReadOnly ? 'Unlock editor for editing' : 'Lock editor to read-only'}
+                  aria-label={editorReadOnly ? 'Unlock editor' : 'Lock editor'}
                   aria-pressed={!editorReadOnly}
-                  className={`flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-lg
-                    transition-all duration-150
+                  className={`text-[11px] font-medium px-2 py-0.5 rounded
+                    transition-colors duration-150
                     ${editorReadOnly
-                      ? 'text-zinc-400 bg-[#1e1e26] border border-[#2a2a34] hover:bg-[#252530] hover:text-zinc-300'
-                      : 'text-indigo-300 bg-indigo-950 border border-indigo-800 hover:bg-indigo-900'
+                      ? 'text-zinc-600 hover:text-zinc-400'
+                      : 'text-emerald-400/80'
                     }`}
                 >
-                  {editorReadOnly ? (
-                    <svg className="w-3.5 h-3.5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                    </svg>
-                  )}
                   {editorReadOnly ? 'Locked' : 'Editing'}
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 min-h-0 bg-[#0c0c10]">
+            <div className="flex-1 min-h-0 bg-[#09090b]">
               <ShaderEditor
-                code={editorCode || '// Shader code will appear here after generation...'}
+                code={editorCode || '// Shader code appears here after generation...'}
                 readOnly={editorReadOnly}
                 onChange={editorReadOnly ? undefined : setEditorCode}
+                changedLines={changedLines}
               />
             </div>
           </div>
@@ -333,33 +331,21 @@ export default function App() {
         <div
           role="separator"
           aria-orientation="vertical"
-          aria-label="Resize panels. Use arrow keys to adjust."
+          aria-label="Resize panels"
           aria-valuenow={panelWidth}
           aria-valuemin={320}
           aria-valuemax={typeof window !== 'undefined' ? window.innerWidth - 400 : 1000}
           tabIndex={0}
           onMouseDown={handleDragStart}
           onKeyDown={handleDragKeyDown}
-          className="group w-1 cursor-col-resize shrink-0 relative
-                     bg-transparent hover:bg-indigo-500/20 active:bg-indigo-500/30
-                     focus-visible:bg-indigo-500/20 transition-colors duration-150"
+          className="group w-3 cursor-col-resize shrink-0 relative
+                     flex items-center justify-center"
         >
-          {/* Visible center line */}
-          <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px
-                         bg-white/[0.04] group-hover:bg-indigo-500/40 group-active:bg-indigo-400/60
-                         transition-colors duration-150" aria-hidden="true" />
-          {/* Grab dots indicator */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                         opacity-0 group-hover:opacity-100 transition-opacity duration-150" aria-hidden="true">
-            <div className="flex flex-col gap-1">
-              <div className="w-1 h-1 rounded-full bg-indigo-400/60" />
-              <div className="w-1 h-1 rounded-full bg-indigo-400/60" />
-              <div className="w-1 h-1 rounded-full bg-indigo-400/60" />
-            </div>
-          </div>
+          <div className="w-px h-full bg-white/[0.06] group-hover:bg-white/[0.15]
+                          group-active:bg-white/[0.25] transition-colors duration-150" />
         </div>
 
-        {/* Right panel: WebGL canvas */}
+        {/* Canvas */}
         <main className="flex-1 relative bg-black" aria-label="Shader preview">
           <ShaderCanvas
             ref={canvasRef}
@@ -370,23 +356,17 @@ export default function App() {
 
           {error && (
             <div role="alert"
-              className="absolute top-4 left-4 right-4 px-4 py-3 rounded-xl
-                         bg-[#1a0a0a]/90 backdrop-blur-md
-                         border border-red-500/20
-                         text-red-300 text-[13px]
-                         shadow-xl shadow-red-900/20 animate-fade-in-up">
-              {/* Gradient top line */}
-              <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-red-500/40 to-transparent" aria-hidden="true" />
-              <div className="flex items-center gap-2.5">
-                <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 shadow-sm shadow-red-500/40" aria-hidden="true" />
-                {error}
-              </div>
+              className="absolute top-3 left-3 right-3 px-3 py-2.5 rounded-lg
+                         bg-red-950/80 backdrop-blur-sm
+                         border border-red-500/15
+                         text-red-400 text-[12px]
+                         animate-fade-in">
+              {error}
             </div>
           )}
         </main>
       </div>
 
-      {/* Shortcuts modal */}
       <ShortcutsModal isOpen={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
     </div>
   );

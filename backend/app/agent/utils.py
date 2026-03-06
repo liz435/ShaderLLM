@@ -107,12 +107,23 @@ def extract_dsl_json(text: str) -> dict | None:
     return None
 
 
-# Keywords that suggest the prompt is too complex for the DSL
+# Keywords that suggest the prompt is too complex for the DSL.
+# These need real GLSL with geometry, lighting, or structured layering
+# that the DSL's simple op-chain cannot express.
 _COMPLEX_KEYWORDS = {
+    # 3D / advanced rendering
     "raymarching", "ray marching", "ray tracing", "raytracing",
     "3d scene", "volumetric", "physically based", "pbr",
     "fluid simulation", "particles", "reaction diffusion",
     "turing pattern", "cellular automata",
+    # Nature scenes requiring per-element geometry or layered depth
+    "grass", "field", "meadow", "lawn", "vegetation",
+    "forest", "trees", "tree", "rain", "snow", "snowfall",
+    "ocean", "waves", "water", "sea", "lake", "river",
+    "fire", "flame", "flames", "campfire", "torch",
+    "terrain", "mountain", "landscape", "canyon",
+    "cloud", "clouds", "sky", "sunset", "sunrise",
+    "city", "buildings", "corridor", "hallway", "room",
 }
 
 

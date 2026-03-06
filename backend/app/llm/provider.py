@@ -13,6 +13,7 @@ def get_llm() -> BaseChatModel:
             api_key=settings.openai_api_key,
             temperature=settings.temperature,
             max_tokens=settings.max_tokens,
+            max_retries=settings.llm_max_retries,
             streaming=True,
         )
     return ChatAnthropic(
@@ -20,5 +21,6 @@ def get_llm() -> BaseChatModel:
         api_key=settings.anthropic_api_key,
         temperature=settings.temperature,
         max_tokens=settings.max_tokens,
+        max_retries=settings.llm_max_retries,
         streaming=True,
     )

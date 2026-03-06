@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 
 interface ShaderHistoryState {
   current: string | null;
+  previous: string | null;
   canUndo: boolean;
   canRedo: boolean;
   push: (code: string) => void;
@@ -57,5 +58,7 @@ export function useShaderHistory(maxSize = 50): ShaderHistoryState {
     updateFlags();
   }, [updateFlags]);
 
-  return { current, canUndo, canRedo, push, undo, redo, reset };
+  const previous = past.current.length > 0 ? past.current[past.current.length - 1] : null;
+
+  return { current, previous, canUndo, canRedo, push, undo, redo, reset };
 }

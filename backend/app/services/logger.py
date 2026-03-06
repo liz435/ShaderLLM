@@ -20,9 +20,9 @@ import time
 import uuid
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Any
 
 from app.config import settings
+from app.services.filelock import atomic_write
 
 # Resolve storage paths relative to backend/ root
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -106,12 +106,12 @@ class SessionLog:
         # Save shader file
         if self.final_shader:
             shader_path = SHADERS_DIR / f"{self.session_id}.frag"
-            shader_path.write_text(self.final_shader)
+            atomic_write(shader_path, self.final_shader)
             self.shader_file = f"shaders/{self.session_id}.frag"
 
         # Save session JSON
         session_path = SESSIONS_DIR / f"{self.session_id}.json"
-        session_path.write_text(json.dumps(asdict(self), indent=2, default=str))
+        atomic_write(session_path, json.dumps(asdict(self), indent=2, default=str))
 
     def to_summary(self) -> dict:
         """Return a lightweight summary for the history API."""

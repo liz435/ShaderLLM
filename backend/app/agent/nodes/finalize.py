@@ -1,9 +1,11 @@
 import time
 
+from app.agent.error_handling import safe_node
 from app.agent.state import AgentState
 from app.models.events import SSEEvent
 
 
+@safe_node
 async def finalize(state: AgentState) -> dict:
     """Emit the final result event with summary metadata."""
     events: list[SSEEvent] = []

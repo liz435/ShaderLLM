@@ -5,7 +5,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 
 from app.agent.examples import get_available_tags, search_by_keywords
-from app.agent.prompts import CLARIFY_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT
+from backend.app.agent.prompts.v0.prompts import CLARIFY_SYSTEM_PROMPT, DRAFT_SYSTEM_PROMPT, REFINE_SYSTEM_PROMPT
 from app.agent.state import AgentState
 from app.agent.utils import build_draft_prompt, extract_glsl, extract_reasoning
 from app.config import settings
@@ -95,9 +95,9 @@ async def draft_shader(state: AgentState) -> dict:
     """Generate a new GLSL shader from the user's prompt.
 
     Flow:
-    1. Check prompt clarity — if too vague, return a clarification question
-    2. LLM calls search_shader_examples tool to find relevant references
-    3. LLM generates the shader with those examples as context
+    1. Run clarity check AND example search in parallel
+    2. If too vague, return a clarification question (cancel generation)
+    3. LLM generates the shader with examples as context
     Falls back to static example selection if tool calling fails.
     """
     llm = get_llm()
@@ -106,10 +106,36 @@ async def draft_shader(state: AgentState) -> dict:
     events: list[SSEEvent] = []
     user_prompt = state["user_prompt"]
 
-    # Step 0: Clarity check — ask follow-up if prompt is too vague
+    # Run clarity check and tool-calling LLM call in parallel.
+    # If clarity check returns CLARIFY, we cancel the generation task.
     events.append(SSEEvent(type="thinking", data={"text": "Analyzing prompt..."}))
-    clarification = await _check_clarity(llm, user_prompt)
+
+    llm_with_tools = llm.bind_tools(_TOOLS)
+    tool_messages = [
+        SystemMessage(content=DRAFT_SYSTEM_PROMPT),
+        HumanMessage(
+            content=(
+                f"{user_prompt}\n\n"
+                "Before generating the shader, call the search_shader_examples tool "
+                "to find relevant reference examples. Pick 2-3 keywords that describe "
+                "the visual effect the user wants."
+            )
+        ),
+    ]
+
+    clarity_task = asyncio.create_task(_check_clarity(llm, user_prompt))
+    tool_task = asyncio.create_task(
+        asyncio.wait_for(llm_with_tools.ainvoke(tool_messages), timeout=settings.request_timeout)
+    )
+
+    # Wait for clarity check first (it's fast)
+    try:
+        clarification = await clarity_task
+    except Exception:
+        clarification = None
+
     if clarification:
+        tool_task.cancel()
         events.append(SSEEvent(type="clarification", data={
             "question": clarification,
         }))
@@ -122,27 +148,11 @@ async def draft_shader(state: AgentState) -> dict:
 
     events.append(SSEEvent(type="thinking", data={"text": "Generating shader..."}))
 
-    # Bind the example search tool to the LLM
-    llm_with_tools = llm.bind_tools(_TOOLS)
-
-    messages = [
-        SystemMessage(content=DRAFT_SYSTEM_PROMPT),
-        HumanMessage(
-            content=(
-                f"{user_prompt}\n\n"
-                "Before generating the shader, call the search_shader_examples tool "
-                "to find relevant reference examples. Pick 2-3 keywords that describe "
-                "the visual effect the user wants."
-            )
-        ),
-    ]
+    messages = tool_messages
 
     try:
-        # Step 1: LLM decides what examples to fetch
-        response = await asyncio.wait_for(
-            llm_with_tools.ainvoke(messages),
-            timeout=settings.request_timeout,
-        )
+        # tool_task was started in parallel with clarity check — await it
+        response = await tool_task
 
         # Check if the LLM made a tool call
         if response.tool_calls:
@@ -164,7 +174,14 @@ async def draft_shader(state: AgentState) -> dict:
 
             # Step 2: LLM generates shader with examples as context (no tools bound)
             messages.append(HumanMessage(
-                content="Now generate the shader. Output <reasoning>...</reasoning> then ```glsl code."
+                content=(
+                    "Now generate the shader. Study the reference examples carefully — "
+                    "match their level of structural complexity and technique (not just colors). "
+                    "If an example uses ray-plane intersection, per-element geometry, or volumetric "
+                    "rendering, your shader must use a comparable technique. "
+                    "Do NOT simplify to a flat noise field or single color ramp.\n\n"
+                    "Output <reasoning>...</reasoning> then ```glsl code."
+                )
             ))
             response = await asyncio.wait_for(
                 llm.ainvoke(messages),

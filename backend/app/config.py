@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     max_tokens: int = 4096
     temperature: float = 0.7
     request_timeout: int = 60
+    llm_max_retries: int = 2
+
+    # Rate limiting
+    rate_limit_rpm: int = 20  # max requests per minute per IP
+    max_request_body_bytes: int = 100_000  # 100 KB max request body
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

@@ -17,6 +17,8 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from app.services.filelock import atomic_write
+
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
 STORAGE_DIR = _BACKEND_ROOT / "storage"
 CONVERSATIONS_DIR = STORAGE_DIR / "conversations"
@@ -53,7 +55,7 @@ class Conversation:
     def save(self):
         _ensure_dirs()
         path = CONVERSATIONS_DIR / f"{self.conversation_id}.json"
-        path.write_text(json.dumps(asdict(self), indent=2, default=str))
+        atomic_write(path, json.dumps(asdict(self), indent=2, default=str))
 
     def to_dict(self) -> dict:
         return asdict(self)

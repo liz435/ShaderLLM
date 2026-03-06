@@ -12,129 +12,39 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background-color: #0a0a0c;
+  background-color: #09090b;
   color: #e4e4e7;
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ---- Focus visible ring (a11y) ---- */
+/* ---- Focus ---- */
 :focus-visible {
-  outline: 2px solid #818cf8;
+  outline: 1.5px solid rgba(255, 255, 255, 0.2);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
 /* ---- Scrollbar ---- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(129, 140, 248, 0.2);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(129, 140, 248, 0.35);
-}
-
-* {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(129, 140, 248, 0.2) transparent;
-}
-
-/* ---- Surface system ---- */
-.surface-base { background: #0e0e12; }
-.surface-1 { background: #131318; }
-.surface-2 { background: #1a1a22; }
-.surface-3 { background: #22222e; }
-
-/* ---- Gradient border utility ---- */
-.gradient-border {
-  position: relative;
-}
-.gradient-border::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  padding: 1px;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3), rgba(168, 85, 247, 0.15), rgba(99, 102, 241, 0.05));
-  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-
-/* ---- Glow effects ---- */
-.glow-indigo {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.15), 0 0 60px rgba(99, 102, 241, 0.05);
-}
-.glow-indigo-sm {
-  box-shadow: 0 0 10px rgba(99, 102, 241, 0.1), 0 0 30px rgba(99, 102, 241, 0.03);
-}
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.08); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.14); }
+* { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.08) transparent; }
 
 /* ---- Animations ---- */
-@keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(8px); }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-fade-in-up {
-  animation: fade-in-up 0.3s ease-out forwards;
-}
+.animate-fade-in { animation: fade-in 0.25s ease-out forwards; }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
-  50% { box-shadow: 0 0 8px 3px rgba(34, 197, 94, 0.15); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.4); }
+  50% { box-shadow: 0 0 6px 2px rgba(74, 222, 128, 0.1); }
 }
-.animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.animate-shimmer {
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-}
-
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes gradient-shift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.animate-gradient {
-  background-size: 200% 200%;
-  animation: gradient-shift 6s ease infinite;
-}
-
-/* ---- Grain overlay ---- */
-.grain::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 9999;
-}
+.animate-pulse-glow { animation: pulse-glow 2.5s ease-in-out infinite; }
 
 /* ---- Reduced motion ---- */
 @media (prefers-reduced-motion: reduce) {
@@ -145,68 +55,8 @@ body,
   }
 }
 
-/* ---- CodeMirror integration ---- */
-.cm-editor {
-  background: transparent !important;
-  font-size: 12.5px !important;
-  line-height: 1.6 !important;
-}
-
-.cm-editor .cm-gutters {
-  background: rgba(99, 102, 241, 0.03) !important;
-  border-right: 1px solid rgba(99, 102, 241, 0.08) !important;
-}
-
-.cm-editor .cm-activeLineGutter {
-  background: rgba(99, 102, 241, 0.06) !important;
-}
-
-.cm-editor .cm-activeLine {
-  background: rgba(99, 102, 241, 0.04) !important;
-}
-
-/* ---- Button base ---- */
-.btn-ghost {
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: #a1a1aa;
-  background: transparent;
-  border: 1px solid transparent;
-  transition: all 0.15s ease;
-}
-.btn-ghost:hover {
-  color: #e4e4e7;
-  background: rgba(99, 102, 241, 0.08);
-  border-color: rgba(99, 102, 241, 0.15);
-}
-.btn-ghost:active {
-  background: rgba(99, 102, 241, 0.12);
-}
-
-.btn-primary {
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-  border: none;
-  box-shadow: 0 2px 12px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255,255,255,0.1);
-  transition: all 0.15s ease;
-}
-.btn-primary:hover {
-  box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255,255,255,0.1);
-  transform: translateY(-1px);
-}
-.btn-primary:active {
-  transform: translateY(0);
-  box-shadow: 0 1px 8px rgba(99, 102, 241, 0.3);
-}
-.btn-primary:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
-}
+/* ---- CodeMirror ---- */
+.cm-editor { background: transparent !important; font-size: 12px !important; line-height: 1.65 !important; }
+.cm-editor .cm-gutters { background: transparent !important; border-right: 1px solid rgba(255,255,255,0.04) !important; }
+.cm-editor .cm-activeLineGutter { background: rgba(255,255,255,0.03) !important; }
+.cm-editor .cm-activeLine { background: rgba(255,255,255,0.02) !important; }

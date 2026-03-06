@@ -46,10 +46,7 @@ export default function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps)
                  text-zinc-200"
       aria-label="Keyboard shortcuts"
     >
-      {/* Gradient line at top */}
-      <div className="h-px bg-gradient-to-r from-transparent via-indigo-500/30 to-transparent" aria-hidden="true" />
-
-      <div className="flex items-center justify-between px-6 py-4">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
         <h2 className="text-[15px] font-bold text-zinc-100">Keyboard Shortcuts</h2>
         <button
           onClick={onClose}

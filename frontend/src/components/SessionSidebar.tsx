@@ -95,8 +95,7 @@ export default function SessionSidebar({ isOpen, onClose }: SessionSidebarProps)
           </button>
         </div>
 
-        {/* Gradient separator */}
-        <div className="h-px bg-gradient-to-r from-indigo-500/20 via-white/[0.04] to-transparent" aria-hidden="true" />
+        <div className="h-px bg-white/[0.06]" aria-hidden="true" />
 
         {/* Search */}
         <div className="px-3 pt-3">
@@ -108,8 +107,7 @@ export default function SessionSidebar({ isOpen, onClose }: SessionSidebarProps)
             aria-label="Search sessions"
             className="w-full px-3 py-2 rounded-lg bg-white/[0.04] border border-white/[0.06]
                        text-[13px] text-zinc-200 placeholder-zinc-600
-                       outline-none focus:border-indigo-500/30 focus:bg-white/[0.06]
-                       focus:shadow-[0_0_0_3px_rgba(99,102,241,0.08)]
+                       outline-none focus:border-white/[0.12] focus:bg-white/[0.06]
                        transition-all duration-200"
           />
         </div>
@@ -119,12 +117,11 @@ export default function SessionSidebar({ isOpen, onClose }: SessionSidebarProps)
           <button
             onClick={() => { startNewSession(); onClose(); }}
             className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl
-                       text-[13px] font-semibold text-white
-                       bg-gradient-to-r from-indigo-500 to-violet-500
-                       shadow-lg shadow-indigo-500/20
-                       hover:shadow-xl hover:shadow-indigo-500/25
-                       active:shadow-md
-                       transition-all duration-200">
+                       text-[13px] font-semibold text-zinc-200
+                       bg-white/[0.08] border border-white/[0.08]
+                       hover:bg-white/[0.12] hover:text-white
+                       active:bg-white/[0.06]
+                       transition-all duration-150">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
             </svg>
@@ -153,9 +150,9 @@ export default function SessionSidebar({ isOpen, onClose }: SessionSidebarProps)
                         onChange={(e) => setEditTitle(e.target.value)}
                         onBlur={() => handleRename(session.conversation_id)}
                         onKeyDown={(e) => { if (e.key === 'Escape') setEditingId(null); }}
-                        className="w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-indigo-500/30
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.12]
                                    text-[13px] text-zinc-200
-                                   outline-none focus:ring-1 focus:ring-indigo-500/50"
+                                   outline-none focus:border-white/[0.2]"
                         aria-label="Rename session"
                       />
                     </form>
@@ -187,7 +184,7 @@ export default function SessionSidebar({ isOpen, onClose }: SessionSidebarProps)
                       className={`w-full text-left px-3 py-2.5 rounded-xl text-[13px]
                                  transition-all duration-150
                                  ${session.conversation_id === conversationId
-                                   ? 'bg-indigo-500/10 border border-indigo-500/20 text-indigo-200'
+                                   ? 'bg-white/[0.06] border border-white/[0.08] text-zinc-200'
                                    : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200 border border-transparent'
                                  }`}
                     >

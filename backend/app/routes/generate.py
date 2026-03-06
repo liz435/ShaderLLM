@@ -28,13 +28,44 @@ router = APIRouter()
 # ──────────────────────────────────────────────
 
 class TokenStreamHandler(AsyncCallbackHandler):
-    """Pushes LLM token deltas to an asyncio queue for real-time SSE streaming."""
+    """Pushes LLM token deltas to an asyncio queue for real-time SSE streaming.
 
-    def __init__(self, queue: asyncio.Queue):
+    In refine mode, only the <reasoning> section is streamed. Code block tokens
+    are suppressed since the final shader arrives via the shader_code event.
+    """
+
+    def __init__(self, queue: asyncio.Queue, suppress_code: bool = False):
         self.queue = queue
+        self._suppress_code = suppress_code
+        self._buf = ""
+        self._in_code_block = False
 
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-        if token:
+        if not token:
+            return
+
+        if self._suppress_code:
+            self._buf += token
+            # Detect code fence transitions
+            if not self._in_code_block and "```" in self._buf:
+                # Entered a code block — stream everything before the fence
+                idx = self._buf.index("```")
+                before = self._buf[:idx]
+                if before.strip():
+                    await self.queue.put(("text_delta", before))
+                self._in_code_block = True
+                self._buf = ""
+                return
+            if self._in_code_block:
+                # Check for closing fence
+                if "```" in self._buf.split("\n", 1)[-1] if "\n" in self._buf else False:
+                    self._in_code_block = False
+                self._buf = ""
+                return
+            # Not in code block — flush buffer
+            await self.queue.put(("text_delta", token))
+            self._buf = self._buf[-10:]  # Keep small tail for fence detection
+        else:
             await self.queue.put(("text_delta", token))
 
 
@@ -51,15 +82,12 @@ def _make_initial_state(
     return {
         "user_prompt": prompt,
         "fragment_shader": existing_shader,
-        "validation_result": None,
         "retry_count": 0,
         "max_retries": settings.max_retries,
         "pending_events": [],
         "mode": mode,
         "conversation_history": conversation_history or [],
         "repair_history": [],
-        "clarification": None,
-        "error": None,
     }
 
 
@@ -113,7 +141,7 @@ async def _run_graph_stream(
 ):
     """Shared SSE streaming logic with real-time token deltas."""
     queue: asyncio.Queue = asyncio.Queue()
-    handler = TokenStreamHandler(queue)
+    handler = TokenStreamHandler(queue, suppress_code=(mode == "refine"))
     config = {"callbacks": [handler]}
 
     ids = {
