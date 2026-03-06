@@ -1,3 +1,4 @@
+import json
 import re
 
 from app.agent.examples import select_examples
@@ -70,3 +71,58 @@ def get_shader_line_context(shader: str, line_num: int, context: int = 2) -> str
         marker = ">>>" if i == line_num - 1 else "   "
         result.append(f"{marker} {i + 1:3d} | {lines[i]}")
     return "\n".join(result)
+
+
+def extract_dsl_json(text: str) -> dict | None:
+    """Extract a JSON object from ```json fences or raw JSON in LLM response."""
+    # Try fenced JSON blocks first
+    patterns = [
+        r"```json\s*\n(.*?)```",
+        r"```\s*\n(\{.*?\})\s*```",
+    ]
+    for pattern in patterns:
+        m = re.search(pattern, text, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(1).strip())
+            except json.JSONDecodeError:
+                continue
+
+    # Fallback: find the outermost { ... } in the text
+    depth = 0
+    start = None
+    for i, ch in enumerate(text):
+        if ch == "{":
+            if depth == 0:
+                start = i
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0 and start is not None:
+                try:
+                    return json.loads(text[start : i + 1])
+                except json.JSONDecodeError:
+                    start = None
+
+    return None
+
+
+# Keywords that suggest the prompt is too complex for the DSL
+_COMPLEX_KEYWORDS = {
+    "raymarching", "ray marching", "ray tracing", "raytracing",
+    "3d scene", "volumetric", "physically based", "pbr",
+    "fluid simulation", "particles", "reaction diffusion",
+    "turing pattern", "cellular automata",
+}
+
+
+def classify_prompt_complexity(prompt: str) -> str:
+    """Classify whether a prompt should use the DSL path or direct GLSL.
+
+    Returns 'dsl' or 'direct'.
+    """
+    lower = prompt.lower()
+    for keyword in _COMPLEX_KEYWORDS:
+        if keyword in lower:
+            return "direct"
+    return "dsl"

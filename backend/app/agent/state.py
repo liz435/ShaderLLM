@@ -55,5 +55,9 @@ class AgentState(TypedDict):
     # Clarification question (if prompt was too vague)
     clarification: str | None
 
+    # DSL support
+    use_dsl: bool
+    dsl_spec: dict | None
+
     # Error message if unrecoverable
     error: str | None
